@@ -34,10 +34,7 @@ public class CourtSquare : MonoBehaviour
         // Rule Check: 2 or more bounces means out
         if (bounceCount >= 2)
         {
-            if (GameManager.Instance != null)
-            {
-                GameManager.Instance.TriggerOut($"Square {squareID} allowed 2+ bounces!");
-            }
+            // Out Function
             
             // Reset count to prevent spamming logs
             bounceCount = 0;
