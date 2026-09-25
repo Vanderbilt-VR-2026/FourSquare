@@ -15,6 +15,12 @@ public class StartScreenUI : MonoBehaviour
     [SerializeField] private GameObject createRoomPanel;
     [SerializeField] private GameObject joinRoomPanel;
 
+    private void Start()
+    {
+        // Always start on the main Start Screen.
+        ShowStartScreen();
+    }
+
     private void OnEnable()
     {
         if (createRoomButton != null)
@@ -51,25 +57,45 @@ public class StartScreenUI : MonoBehaviour
             joinRoomBackButton.onClick.RemoveListener(OnBackClicked);
     }
 
+    private void ShowStartScreen()
+    {
+        if (startScreenPanel != null)
+            startScreenPanel.SetActive(true);
+
+        if (createRoomPanel != null)
+            createRoomPanel.SetActive(false);
+
+        if (joinRoomPanel != null)
+            joinRoomPanel.SetActive(false);
+    }
+
     private void OnCreateRoomClicked()
     {
-        startScreenPanel.SetActive(false);
-        joinRoomPanel.SetActive(false);
-        createRoomPanel.SetActive(true);
+        if (startScreenPanel != null)
+            startScreenPanel.SetActive(false);
+
+        if (joinRoomPanel != null)
+            joinRoomPanel.SetActive(false);
+
+        if (createRoomPanel != null)
+            createRoomPanel.SetActive(true);
     }
 
     private void OnJoinRoomClicked()
     {
-        startScreenPanel.SetActive(false);
-        createRoomPanel.SetActive(false);
-        joinRoomPanel.SetActive(true);
+        if (startScreenPanel != null)
+            startScreenPanel.SetActive(false);
+
+        if (createRoomPanel != null)
+            createRoomPanel.SetActive(false);
+
+        if (joinRoomPanel != null)
+            joinRoomPanel.SetActive(true);
     }
 
     private void OnBackClicked()
     {
-        createRoomPanel.SetActive(false);
-        joinRoomPanel.SetActive(false);
-        startScreenPanel.SetActive(true);
+        ShowStartScreen();
     }
 
     private void OnQuitClicked()
