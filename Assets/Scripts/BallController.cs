@@ -6,7 +6,7 @@ public class BallController : MonoBehaviour
     [Header("Ball Colliders")]
     [SerializeField] private SphereCollider physicalCollider;
     [SerializeField] private SphereCollider catchZone;
-    [SerializeField] private float catchRadius = 0.6096f;
+    [SerializeField] private float catchRadius = 0.8f;
 
     [Header("Ball Physics")]
     [SerializeField] private Rigidbody ballRigidbody;
