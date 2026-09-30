@@ -1,7 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
-
+using TMPro;
 public class StartScreenUI : MonoBehaviour
 {
     [Header("Buttons")]
@@ -25,6 +25,10 @@ public class StartScreenUI : MonoBehaviour
 
     // Moves the menu slightly above eye level.
     [SerializeField] private float menuHeightOffset = 0.15f;
+
+    [Header("Room Creation")]
+    [SerializeField] private RoomCodeManager roomCodeManager;
+    [SerializeField] private TMP_Text roomCodeText;
 
     private IEnumerator Start()
     {
@@ -137,16 +141,24 @@ public class StartScreenUI : MonoBehaviour
     }
 
     private void OnCreateRoomClicked()
+{
+    if (startScreenPanel != null)
+        startScreenPanel.SetActive(false);
+
+    if (joinRoomPanel != null)
+        joinRoomPanel.SetActive(false);
+
+    if (createRoomPanel != null)
+        createRoomPanel.SetActive(true);
+
+    // Generate and display a unique 4-letter room code.
+    if (roomCodeManager != null && roomCodeText != null)
     {
-        if (startScreenPanel != null)
-            startScreenPanel.SetActive(false);
-
-        if (joinRoomPanel != null)
-            joinRoomPanel.SetActive(false);
-
-        if (createRoomPanel != null)
-            createRoomPanel.SetActive(true);
+        string roomCode = roomCodeManager.CreateUniqueRoomCode();
+        roomCodeText.text = "ROOM CODE: " + roomCode;
     }
+}
+    
 
     private void OnJoinRoomClicked()
     {
