@@ -1,6 +1,8 @@
 
 # FourSquare VR — Sprint 1
 
+Note: Sprint 1 has separated scenes, so each was rendered into its own .apk file and demo video. Builds are in the ```SprintBuilds``` folder and demos are in the ```SprintDemos``` folder.
+
 FourSquare VR is a virtual reality recreation of the traditional Four Square game, developed for Meta Quest using Unity. The goal of the project is to create an interactive multiplayer VR experience where players can enter a Four Square court, interact with the ball using VR controllers, and create or join rooms to play with other players.
 
 The project is developed using **Unity 6.3 LTS (6000.3.23f1)** with the **XR Interaction Toolkit** and is currently targeting **Meta Quest 3 / Android**.
