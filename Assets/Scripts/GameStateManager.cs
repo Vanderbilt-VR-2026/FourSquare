@@ -31,6 +31,27 @@ public class GameStateManager : MonoBehaviour
     public SquareRole LastTouchedByPlayerRole => lastTouchedByPlayerRole;
     public bool IsBallInPlay => isBallInPlay;
 
+    public void RegisterPlayer(string playerId, SquareRole role)
+    {
+        if (role == SquareRole.Spectator || string.IsNullOrWhiteSpace(playerId))
+        {
+            return;
+        }
+
+        FourSquarePlayer existingPlayer = playerList.Find(player => player.playerId == playerId);
+        if (existingPlayer == null)
+        {
+            existingPlayer = new FourSquarePlayer(playerId, playerId, role);
+            playerList.Add(existingPlayer);
+        }
+        else
+        {
+            existingPlayer.currentRole = role;
+        }
+
+        InitializeDictionary();
+    }
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -93,9 +114,9 @@ public class GameStateManager : MonoBehaviour
     /// Call when a player makes a fault or gets eliminated.
     /// The eliminated player drops down to Peasant, and lower-ranked players move up.
     /// </summary>
-    public void EliminatePlayer(SquareRole eliminatedRole)
+    public bool EliminatePlayer(SquareRole eliminatedRole)
     {
-        if (!activePlayers.ContainsKey(eliminatedRole)) return;
+        if (!activePlayers.ContainsKey(eliminatedRole)) return false;
 
         FourSquarePlayer faultPlayer = activePlayers[eliminatedRole];
         faultPlayer.eliminationsCount++;
@@ -109,10 +130,11 @@ public class GameStateManager : MonoBehaviour
         // If Peasant eliminated, no rank movements happen—Peasant stays Peasant
         if (eliminatedRole == SquareRole.Peasant)
         {
-            return;
+            return true;
         }
 
         RotateRoles(eliminatedRole);
+        return true;
     }
 
     private void RotateRoles(SquareRole faultRole)
