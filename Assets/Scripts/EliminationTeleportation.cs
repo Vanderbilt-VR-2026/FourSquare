@@ -37,7 +37,7 @@ public class EliminationTeleportation : NetworkBehaviour
         EliminationPlayer[] players = FindObjectsByType<EliminationPlayer>(FindObjectsSortMode.None);
         foreach (EliminationPlayer player in players)
         {
-            player.TeleportTo(GetSpawnPoint(player.NetworkRole));
+            player.TeleportNetworkPlayer(GetSpawnPoint(player.NetworkRole));
         }
     }
 

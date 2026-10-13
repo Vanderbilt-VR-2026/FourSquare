@@ -92814,6 +92814,7 @@ GameObject:
   - component: {fileID: 1683436355}
   - component: {fileID: 1683436357}
   - component: {fileID: 1683436356}
+  - component: {fileID: 1683436358}
   m_Layer: 0
   m_Name: EliminationSystem
   m_TagString: Untagged
@@ -92872,6 +92873,24 @@ MonoBehaviour:
   NetworkedBehaviours:
   - {fileID: 1683436356}
   ForceRemoteRenderTimeframe: 0
+--- !u!114 &1683436358
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1683436354}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 360b11ccd6244c64691d728b8f4b7729, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerJoinCourt
+  playerPrefab: {fileID: 4094594771929142560, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
+  squareSpawnPoints:
+  - {fileID: 423353234}
+  - {fileID: 1227580847}
+  - {fileID: 1158822429}
+  - {fileID: 1894422718}
 --- !u!1 &1684940966
 GameObject:
   m_ObjectHideFlags: 0
@@ -106917,7 +106936,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!81 &1987600149
 AudioListener:
   m_ObjectHideFlags: 0
@@ -114380,6 +114399,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: VR Player
       objectReference: {fileID: 0}
+    - target: {fileID: 4094594771929142560, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
+      propertyPath: SortKey
+      value: 1511588621
+      objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -114454,6 +114477,50 @@ MonoBehaviour:
   Components:
   - {fileID: 510606215866237877}
   _guid: 30bbe29d-9428-4381-
+--- !u!1 &1900000000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1900000002}
+  - component: {fileID: 1900000001}
+  m_Layer: 0
+  m_Name: Fusion Scene Startup
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1900000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1900000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 91e1f5d9e7bf4c0c9b2f51b4d6e8a731, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::FusionSceneStartup
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -114467,3 +114534,4 @@ SceneRoots:
   - {fileID: 209670634}
   - {fileID: 750755822}
   - {fileID: 520696252}
+  - {fileID: 1900000000}

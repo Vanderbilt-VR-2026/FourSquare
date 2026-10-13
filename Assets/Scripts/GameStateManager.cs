@@ -148,7 +148,11 @@ public class GameStateManager : MonoBehaviour
             SquareRole currentRole = (SquareRole)r;
             SquareRole nextRole = (SquareRole)(r + 1);
 
-            FourSquarePlayer promotingPlayer = activePlayers[currentRole];
+            if (!activePlayers.TryGetValue(currentRole, out FourSquarePlayer promotingPlayer))
+            {
+                continue;
+            }
+
             promotingPlayer.currentRole = nextRole;
 
             OnPlayerRoleChanged?.Invoke(promotingPlayer, currentRole, nextRole);

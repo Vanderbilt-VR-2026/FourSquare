@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.XR.CoreUtils;
+using UnityEngine.XR;
 using Fusion;
 
 [RequireComponent(typeof(XROrigin))]
@@ -16,7 +18,12 @@ public class EliminationPlayer : NetworkBehaviour
     [SerializeField] private InputActionReference triggerAction;
 
     private XROrigin xrOrigin;
-    private bool enabledActionHere;
+    private readonly List<InputAction> subscribedTriggerActions = new List<InputAction>();
+    private readonly List<InputAction> enabledTriggerActions = new List<InputAction>();
+    private bool leftControllerWasPressed;
+    private bool rightControllerWasPressed;
+    private bool xriActionWasPressed;
+    private float nextEliminationRequestTime;
     [Networked]
     public SquareRole NetworkRole { get; private set; }
 
@@ -68,13 +75,38 @@ public class EliminationPlayer : NetworkBehaviour
             }
         }
 
-        if (triggerAction != null)
+        if (!Object.HasInputAuthority)
         {
-            triggerAction.action.performed += HandleTriggerPerformed;
-            if (!triggerAction.action.enabled)
+            return;
+        }
+
+        Debug.Log($"EliminationPlayer input authority ready: {name}, actions={subscribedTriggerActions.Count}, role={NetworkRole}.", this);
+        SubscribeTriggerAction(triggerAction != null ? triggerAction.action : null);
+
+        if (triggerAction != null && triggerAction.action != null)
+        {
+            InputActionAsset inputActions = triggerAction.action.actionMap != null
+                ? triggerAction.action.actionMap.asset
+                : null;
+
+            if (inputActions != null)
             {
-                triggerAction.action.Enable();
-                enabledActionHere = true;
+                foreach (InputActionMap actionMap in inputActions.actionMaps)
+                {
+                    foreach (InputAction action in actionMap.actions)
+                    {
+                        string actionName = action.name.ToLowerInvariant();
+                        if (actionName.Contains("activate") ||
+                            actionName.Contains("select") ||
+                            actionName.Contains("grip") ||
+                            actionName.Contains("trigger"))
+                        {
+                            SubscribeTriggerAction(action);
+                        }
+                    }
+                }
+
+                Debug.Log($"EliminationPlayer subscribed to {subscribedTriggerActions.Count} XRI actions on {name}.", this);
             }
         }
     }
@@ -86,40 +118,201 @@ public class EliminationPlayer : NetworkBehaviour
             GameStateManager.Instance.OnPlayerRoleChanged -= HandleRoleChanged;
         }
 
-        if (triggerAction != null)
+        foreach (InputAction action in subscribedTriggerActions)
         {
-            triggerAction.action.performed -= HandleTriggerPerformed;
-            if (enabledActionHere)
-            {
-                triggerAction.action.Disable();
-                enabledActionHere = false;
-            }
+            action.performed -= HandleTriggerPerformed;
         }
+
+        foreach (InputAction action in enabledTriggerActions)
+        {
+            action.Disable();
+        }
+
+        subscribedTriggerActions.Clear();
+        enabledTriggerActions.Clear();
     }
 
-    private void HandleTriggerPerformed(InputAction.CallbackContext context)
+    private void Update()
     {
-        if (!Object.HasInputAuthority || NetworkRole == SquareRole.Spectator)
+        if (!Object || !Object.HasInputAuthority)
         {
             return;
         }
 
-        RPC_RequestElimination();
+        bool leftPressed = ReadButton(
+            UnityEngine.XR.InputDeviceCharacteristics.Left,
+            UnityEngine.XR.CommonUsages.triggerButton) ||
+            ReadAxis(
+                UnityEngine.XR.InputDeviceCharacteristics.Left,
+                UnityEngine.XR.CommonUsages.trigger) > 0.5f ||
+            ReadButton(
+                UnityEngine.XR.InputDeviceCharacteristics.Left,
+                UnityEngine.XR.CommonUsages.gripButton) ||
+            ReadAxis(
+                UnityEngine.XR.InputDeviceCharacteristics.Left,
+                UnityEngine.XR.CommonUsages.grip) > 0.5f;
+        bool rightPressed = ReadButton(
+            UnityEngine.XR.InputDeviceCharacteristics.Right,
+            UnityEngine.XR.CommonUsages.triggerButton) ||
+            ReadAxis(
+                UnityEngine.XR.InputDeviceCharacteristics.Right,
+                UnityEngine.XR.CommonUsages.trigger) > 0.5f ||
+            ReadButton(
+                UnityEngine.XR.InputDeviceCharacteristics.Right,
+                UnityEngine.XR.CommonUsages.gripButton) ||
+            ReadAxis(
+                UnityEngine.XR.InputDeviceCharacteristics.Right,
+                UnityEngine.XR.CommonUsages.grip) > 0.5f;
+        bool xriActionPressed = IsXriControllerActionPressed();
+
+        if ((leftPressed && !leftControllerWasPressed) ||
+            (rightPressed && !rightControllerWasPressed) ||
+            (xriActionPressed && !xriActionWasPressed))
+        {
+            RequestElimination();
+        }
+
+        leftControllerWasPressed = leftPressed;
+        rightControllerWasPressed = rightPressed;
+        xriActionWasPressed = xriActionPressed;
+    }
+
+    private static bool ReadButton(
+        UnityEngine.XR.InputDeviceCharacteristics hand,
+        UnityEngine.XR.InputFeatureUsage<bool> button)
+    {
+        List<UnityEngine.XR.InputDevice> devices = new List<UnityEngine.XR.InputDevice>();
+        UnityEngine.XR.InputDevices.GetDevicesWithCharacteristics(
+            UnityEngine.XR.InputDeviceCharacteristics.HeldInHand |
+            UnityEngine.XR.InputDeviceCharacteristics.Controller |
+            hand,
+            devices);
+
+        foreach (UnityEngine.XR.InputDevice device in devices)
+        {
+            if (device.TryGetFeatureValue(button, out bool pressed) &&
+                pressed)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static float ReadAxis(
+        UnityEngine.XR.InputDeviceCharacteristics hand,
+        UnityEngine.XR.InputFeatureUsage<float> axis)
+    {
+        List<UnityEngine.XR.InputDevice> devices = new List<UnityEngine.XR.InputDevice>();
+        UnityEngine.XR.InputDevices.GetDevicesWithCharacteristics(
+            UnityEngine.XR.InputDeviceCharacteristics.HeldInHand |
+            UnityEngine.XR.InputDeviceCharacteristics.Controller |
+            hand,
+            devices);
+
+        foreach (UnityEngine.XR.InputDevice device in devices)
+        {
+            if (device.TryGetFeatureValue(axis, out float value))
+            {
+                return value;
+            }
+        }
+
+        return 0f;
+    }
+
+    private bool IsXriControllerActionPressed()
+    {
+        foreach (InputAction action in subscribedTriggerActions)
+        {
+            if (action.IsPressed())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void SubscribeTriggerAction(InputAction action)
+    {
+        if (action == null || subscribedTriggerActions.Contains(action))
+        {
+            return;
+        }
+
+        action.performed += HandleTriggerPerformed;
+        if (!action.enabled)
+        {
+            action.Enable();
+            enabledTriggerActions.Add(action);
+        }
+
+        subscribedTriggerActions.Add(action);
+    }
+
+    private void HandleTriggerPerformed(InputAction.CallbackContext context)
+    {
+        if (!Object.HasInputAuthority)
+        {
+            return;
+        }
+
+        RequestElimination();
+    }
+
+    private void RequestElimination()
+    {
+        if (Time.unscaledTime < nextEliminationRequestTime)
+        {
+            return;
+        }
+
+        nextEliminationRequestTime = Time.unscaledTime + 0.5f;
+        Debug.Log($"Elimination input detected for {name}; stateAuthority={Object.HasStateAuthority}, role={NetworkRole}.", this);
+
+        if (Object.HasStateAuthority)
+        {
+            EliminateOnStateAuthority();
+        }
+        else
+        {
+            RPC_RequestElimination();
+        }
     }
 
     [Rpc(RpcSources.InputAuthority, RpcTargets.StateAuthority)]
     private void RPC_RequestElimination(RpcInfo info = default)
     {
-        if (info.Source != Object.InputAuthority || NetworkRole == SquareRole.Spectator)
+        Debug.Log($"Elimination RPC received for {name} from {info.Source}.", this);
+
+        if (info.Source != Object.InputAuthority)
         {
+            Debug.LogWarning($"Ignoring elimination RPC for {name}: source does not match input authority.", this);
+            return;
+        }
+
+        EliminateOnStateAuthority();
+    }
+
+    private void EliminateOnStateAuthority()
+    {
+        if (!Object.HasStateAuthority)
+        {
+            Debug.LogWarning($"Cannot eliminate {name}: this instance is not state authority.", this);
             return;
         }
 
         EliminationTeleportation teleportation = FindFirstObjectByType<EliminationTeleportation>();
-        if (teleportation != null)
+        if (teleportation == null)
         {
-            teleportation.Eliminate(this);
+            Debug.LogError($"No EliminationTeleportation was found for {name}.", this);
+            return;
         }
+
+        Debug.Log($"Eliminating {name} from role {NetworkRole}.", teleportation);
+        teleportation.Eliminate(this);
     }
 
     private void HandleRoleChanged(FourSquarePlayer player, SquareRole oldRole, SquareRole newRole)
@@ -144,6 +337,56 @@ public class EliminationPlayer : NetworkBehaviour
         }
 
         xrOrigin.transform.SetPositionAndRotation(spawnPoint.position, spawnPoint.rotation);
+
+        if (characterController != null)
+        {
+            characterController.enabled = true;
+        }
+    }
+
+    public void TeleportNetworkPlayer(Transform spawnPoint)
+    {
+        if (spawnPoint == null)
+        {
+            Debug.LogError($"No spawn point was configured for {name}, role={NetworkRole}.", this);
+            return;
+        }
+
+        if (Object.HasInputAuthority)
+        {
+            Debug.Log($"Teleporting local player {name} to {spawnPoint.name}.", this);
+            TeleportTo(spawnPoint.position, spawnPoint.rotation);
+            return;
+        }
+
+        if (Object.HasStateAuthority)
+        {
+            Debug.Log($"Sending teleport RPC for {name} to {spawnPoint.name}.", this);
+            RPC_TeleportTo(spawnPoint.position, spawnPoint.rotation);
+        }
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.InputAuthority)]
+    private void RPC_TeleportTo(Vector3 position, Quaternion rotation, RpcInfo info = default)
+    {
+        Debug.Log($"Teleport RPC received for {name}.", this);
+        TeleportTo(position, rotation);
+    }
+
+    private void TeleportTo(Vector3 position, Quaternion rotation)
+    {
+        if (xrOrigin == null)
+        {
+            return;
+        }
+
+        CharacterController characterController = GetComponent<CharacterController>();
+        if (characterController != null)
+        {
+            characterController.enabled = false;
+        }
+
+        xrOrigin.transform.SetPositionAndRotation(position, rotation);
 
         if (characterController != null)
         {
