@@ -23,6 +23,23 @@ public class EliminationPlayer : NetworkBehaviour
     public string PlayerId => playerId;
     public SquareRole CurrentRole => NetworkRole;
 
+    public void InitializeNetworkPlayer(SquareRole role, string networkPlayerId)
+    {
+        if (!Object.HasStateAuthority)
+        {
+            return;
+        }
+
+        startingRole = role;
+        playerId = networkPlayerId;
+        NetworkRole = role;
+
+        if (GameStateManager.Instance != null)
+        {
+            GameStateManager.Instance.RegisterPlayer(playerId, NetworkRole);
+        }
+    }
+
     private void Awake()
     {
         xrOrigin = GetComponent<XROrigin>();
