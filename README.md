@@ -37,6 +37,8 @@ Selecting **Create Room** generates a random four-letter room code, such as `FRJ
 
 The current room-code implementation is local. Multiplayer room registration and validation across different Quest devices will be integrated with the networking system in a later sprint.
 
+Fusion networking is available for gameplay in the City scene. In Unity, run **FourSquare > Configure Fusion Gameplay** once to bake the XR player and ball prefabs, register them with Fusion, and add/configure the game manager and session bootstrap on the City court. Run this setup again if the City popup reports that no `GameStateManager` exists. The scene joins the shared session `FourSquareVR` automatically, with a four-player limit. All devices must use this same session name and load the City scene. In the court popup, aim either controller ray at a button to highlight it, then squeeze that controller's trigger. Any joined player can start the game: players are assigned King, Queen, Jack, and Peasant in Fusion join order, and the single shared ball drops into the King's square. **Exit Court** returns the player to the floor beside the court. The Create Room and Join Room panels are not yet connected to Fusion; they remain unchanged.
+
 ## Game State and Environment
 
 Sprint 1 establishes the initial architecture required for Four Square gameplay.
@@ -57,7 +59,7 @@ The project currently provides the foundation for the complete Four Square gamep
 
 `Start Screen → Create/Join Room → Four Square Game → End Screen`
 
-Some parts of this flow are still under development and integration. In particular, generated room codes are not yet connected to a shared multiplayer room registry.
+Some parts of this flow are still under development and integration. In particular, the start-screen room panels do not yet select or create Fusion sessions, and generated room codes are not connected to a shared multiplayer room registry.
 
 ## Next Steps
 

@@ -12,6 +12,8 @@ GameObject:
   - component: {fileID: 1397782268724257086}
   - component: {fileID: 5182216397703633798}
   - component: {fileID: 5931536195273062427}
+  - component: {fileID: 350774810742917943}
+  - component: {fileID: 9188102631058289230}
   m_Layer: 0
   m_Name: VR Player
   m_TagString: Player
@@ -90,6 +92,56 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0, y: 1, z: 0}
+--- !u!114 &350774810742917943
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992349184629936267}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
+  SortKey: 2168162589
+  SendPriority: 1
+  EnableInterpolation: 1
+  Flags: 262146
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: 9188102631058289230}
+  ForceRemoteRenderTimeframe: 0
+--- !u!114 &9188102631058289230
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992349184629936267}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7a9c3d2e1b4a6f8c0d7e9b1a3c5d7f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FourSquareFusionPlayer
+  xrOrigin: {fileID: 1397782268724257086}
+  head: {fileID: 5534698580290380372}
+  leftHand: {fileID: 687757885639206756}
+  rightHand: {fileID: 9134842610072369237}
+  avatarRenderers:
+  - {fileID: 4297574636729099772}
+  - {fileID: 3697404328519084993}
+  showLocalAvatar: 0
+  _NetworkRootPosition: {x: 0, y: 0, z: 0}
+  _NetworkRootRotation: {x: 0, y: 0, z: 0, w: 0}
+  _NetworkHeadPosition: {x: 0, y: 0, z: 0}
+  _NetworkHeadRotation: {x: 0, y: 0, z: 0, w: 0}
+  _NetworkLeftHandPosition: {x: 0, y: 0, z: 0}
+  _NetworkLeftHandRotation: {x: 0, y: 0, z: 0, w: 0}
+  _NetworkRightHandPosition: {x: 0, y: 0, z: 0}
+  _NetworkRightHandRotation: {x: 0, y: 0, z: 0, w: 0}
+  _NetworkHasXRTracking: 0
+  _NetworkRole: 0
 --- !u!1 &1094145138487326133
 GameObject:
   m_ObjectHideFlags: 0
@@ -100,6 +152,7 @@ GameObject:
   m_Component:
   - component: {fileID: 687757885639206756}
   - component: {fileID: 5106933270938173939}
+  - component: {fileID: 8735418160599890347}
   m_Layer: 0
   m_Name: Left Hand
   m_TagString: Untagged
@@ -197,6 +250,22 @@ MonoBehaviour:
     m_SingletonActionBindings: []
     m_Flags: 0
     m_Priority: 0
+--- !u!114 &8735418160599890347
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1094145138487326133}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2b3c4d5e6f708192a3b4c5d6e7f8091, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
+  handColliderRadius: 0.08
+  visualCubeSize: 0.12
+  visualMaterial: {fileID: 2100000, guid: 91ea7b756a2cb824fb2c84f3e073c5ab, type: 2}
+  playerRole: 0
 --- !u!1 &1324493728189623182
 GameObject:
   m_ObjectHideFlags: 0
@@ -263,7 +332,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 91ea7b756a2cb824fb2c84f3e073c5ab, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -297,6 +366,7 @@ GameObject:
   m_Component:
   - component: {fileID: 9134842610072369237}
   - component: {fileID: 2341461451226897629}
+  - component: {fileID: 103734083533456955}
   m_Layer: 0
   m_Name: Right Hand
   m_TagString: Untagged
@@ -394,6 +464,22 @@ MonoBehaviour:
     m_SingletonActionBindings: []
     m_Flags: 0
     m_Priority: 0
+--- !u!114 &103734083533456955
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2293859493816063479}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2b3c4d5e6f708192a3b4c5d6e7f8091, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
+  handColliderRadius: 0.08
+  visualCubeSize: 0.12
+  visualMaterial: {fileID: 2100000, guid: 91ea7b756a2cb824fb2c84f3e073c5ab, type: 2}
+  playerRole: 0
 --- !u!1 &2564747234580309914
 GameObject:
   m_ObjectHideFlags: 0
@@ -428,135 +514,6 @@ Transform:
   - {fileID: 9134842610072369237}
   m_Father: {fileID: 6118252723700984474}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &3782281088699936076
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 6761621564404013198}
-  - component: {fileID: 2714301491667509863}
-  - component: {fileID: 957953240559260714}
-  m_Layer: 0
-  m_Name: Turn
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &6761621564404013198
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3782281088699936076}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 3187660813639675899}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2714301491667509863
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3782281088699936076}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 75b29b6c6428c984a8a73ffc2d58063b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit::UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning.ContinuousTurnProvider
-  m_Mediator: {fileID: 2214273076025330362}
-  m_TransformationPriority: 0
-  m_TurnSpeed: 60
-  m_EnableTurnLeftRight: 1
-  m_EnableTurnAround: 0
-  m_LeftHandTurnInput:
-    m_InputSourceMode: 0
-    m_InputAction:
-      m_Name: Left Hand Turn
-      m_Type: 0
-      m_ExpectedControlType: Vector2
-      m_Id: f97a244f-1945-44ea-b995-4700979c744e
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-      m_Priority: 0
-    m_InputActionReference: {fileID: 0}
-    m_ObjectReferenceObject: {fileID: 0}
-    m_ManualValue: {x: 0, y: 0}
-  m_RightHandTurnInput:
-    m_InputSourceMode: 2
-    m_InputAction:
-      m_Name: Right Hand Turn
-      m_Type: 0
-      m_ExpectedControlType: Vector2
-      m_Id: 73dddb5d-5cf1-4215-bfc1-620dd999c6d8
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-      m_Priority: 0
-    m_InputActionReference: {fileID: -6493913391331992944, guid: c348712bda248c246b8c49b3db54643f, type: 3}
-    m_ObjectReferenceObject: {fileID: 0}
-    m_ManualValue: {x: 0, y: 0}
---- !u!114 &957953240559260714
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3782281088699936076}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e9f365cf844c03449bc8973eead2c3c1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit::UnityEngine.XR.Interaction.Toolkit.Locomotion.Turning.SnapTurnProvider
-  m_Mediator: {fileID: 2214273076025330362}
-  m_TransformationPriority: 0
-  m_TurnAmount: 45
-  m_DebounceTime: 0.5
-  m_EnableTurnLeftRight: 1
-  m_EnableTurnAround: 1
-  m_DelayTime: 0
-  m_LeftHandTurnInput:
-    m_InputSourceMode: 0
-    m_InputAction:
-      m_Name: Left Hand Snap Turn
-      m_Type: 0
-      m_ExpectedControlType: Vector2
-      m_Id: 270d0107-7d9e-4262-bcda-6378209b3d3b
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-      m_Priority: 0
-    m_InputActionReference: {fileID: 0}
-    m_ObjectReferenceObject: {fileID: 0}
-    m_ManualValue: {x: 0, y: 0}
-  m_RightHandTurnInput:
-    m_InputSourceMode: 2
-    m_InputAction:
-      m_Name: Right Hand Snap Turn
-      m_Type: 0
-      m_ExpectedControlType: Vector2
-      m_Id: 98ba83c2-8b06-4b33-9145-8fbb6b9f4332
-      m_Processors: 
-      m_Interactions: 
-      m_SingletonActionBindings: []
-      m_Flags: 0
-      m_Priority: 0
-    m_InputActionReference: {fileID: -8525429354371678379, guid: c348712bda248c246b8c49b3db54643f, type: 3}
-    m_ObjectReferenceObject: {fileID: 0}
-    m_ManualValue: {x: 0, y: 0}
 --- !u!1 &4862842752518656564
 GameObject:
   m_ObjectHideFlags: 0
@@ -623,7 +580,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 91ea7b756a2cb824fb2c84f3e073c5ab, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -679,7 +636,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2397068761933427102}
-  - {fileID: 6761621564404013198}
   m_Father: {fileID: 6118252723700984474}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &3042851676265936790
