@@ -1,6 +1,9 @@
 using Fusion;
 using UnityEngine;
 using Unity.XR.CoreUtils;
+#if UNITY_EDITOR
+using UnityEngine.XR.Interaction.Toolkit.Inputs.Simulation;
+#endif
 
 [RequireComponent(typeof(NetworkObject))]
 public class FourSquareFusionPlayer : NetworkBehaviour
@@ -145,7 +148,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void CaptureLocalPose()
     {
-        NetworkHasXRTracking = UnityEngine.XR.XRSettings.isDeviceActive;
+        NetworkHasXRTracking = HasXRTracking();
         NetworkRootPosition = transform.position;
         NetworkRootRotation = transform.rotation;
         if (head != null)
@@ -269,9 +272,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             }
         }
 
-        bool showTrackedHands = isLocal
-            ? UnityEngine.XR.XRSettings.isDeviceActive
-            : NetworkHasXRTracking;
+        bool showTrackedHands = isLocal ? HasXRTracking() : NetworkHasXRTracking;
         bool renderAvatar = isLocal ? showLocalAvatar : true;
         foreach (Renderer avatarRenderer in avatarRenderers)
         {
@@ -296,11 +297,30 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         if (Object == null || !Object.IsValid || !Object.HasInputAuthority) return;
 
-        bool showTrackedHands = UnityEngine.XR.XRSettings.isDeviceActive;
+        bool showTrackedHands = HasXRTracking();
         foreach (BallHandMarker handMarker in handMarkers)
         {
             if (handMarker != null) handMarker.SetTrackingActive(showTrackedHands);
         }
+    }
+
+    private static bool HasXRTracking()
+    {
+        if (UnityEngine.XR.XRSettings.isDeviceActive)
+            return true;
+
+#if UNITY_EDITOR
+        XRInteractionSimulator interactionSimulator =
+            FindAnyObjectByType<XRInteractionSimulator>();
+        if (interactionSimulator != null && interactionSimulator.isActiveAndEnabled)
+            return true;
+
+        XRDeviceSimulator simulator =
+            FindAnyObjectByType<XRDeviceSimulator>();
+        return simulator != null && simulator.isActiveAndEnabled;
+#else
+        return false;
+#endif
     }
 
     private void UpdateHandRoles()

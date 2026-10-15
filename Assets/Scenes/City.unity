@@ -34313,7 +34313,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FourSquareFusionSession
   sessionName: FourSquareVR
   maximumPlayers: 4
-  connectOnStart: 1
+  connectOnStart: 0
   disableXRInEditor: 0
   playerPrefab: {fileID: 350774810742917943, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
   playerSpawnPoint: {fileID: 580323501}

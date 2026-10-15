@@ -53,7 +53,7 @@ public class RoomLobbyUI : MonoBehaviour
         int count = Mathf.Clamp(
             multiplayerRoomManager.PlayerCount,
             0,
-            4
+            multiplayerRoomManager.MaximumPlayers
         );
 
         // Display the current Photon room code.
@@ -70,7 +70,9 @@ public class RoomLobbyUI : MonoBehaviour
         if (playerCountText != null)
         {
             playerCountText.text =
-                "PLAYERS: " + count + "/4";
+                "PLAYERS: " + count + "/" + multiplayerRoomManager.MaximumPlayers +
+                "\nCITY STARTS AT: " +
+                multiplayerRoomManager.RequiredPlayersCount;
         }
 
         // Display four player slots.
@@ -78,7 +80,7 @@ public class RoomLobbyUI : MonoBehaviour
         {
             StringBuilder text = new StringBuilder();
 
-            for (int i = 1; i <= 4; i++)
+            for (int i = 1; i <= multiplayerRoomManager.MaximumPlayers; i++)
             {
                 if (i <= count)
                 {

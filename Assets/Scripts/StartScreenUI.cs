@@ -55,6 +55,29 @@ public class StartScreenUI : MonoBehaviour
             yield break;
         }
 
+        Canvas canvas = menuCanvas.GetComponent<Canvas>();
+        if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
+        {
+            if (menuCanvas.GetComponent<GraphicRaycaster>() == null)
+                menuCanvas.gameObject.AddComponent<GraphicRaycaster>();
+
+            Camera eventCamera = playerCamera.GetComponent<Camera>();
+            if (eventCamera == null)
+                eventCamera = Camera.main;
+
+            if (eventCamera == null || !eventCamera.isActiveAndEnabled)
+            {
+                Debug.LogError(
+                    "The world-space start menu needs an enabled event camera. Assign an enabled camera " +
+                    "to Player Camera or tag it MainCamera.",
+                    this);
+                ShowStartScreen();
+                yield break;
+            }
+
+            canvas.worldCamera = eventCamera;
+        }
+
         yield return new WaitForSecondsRealtime(0.5f);
         bool hasTrackedHeadPose = HasTrackedHeadPose();
         CenterMenuInFrontOfPlayer(hasTrackedHeadPose);
