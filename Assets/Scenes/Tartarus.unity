@@ -31532,6 +31532,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 360b11ccd6244c64691d728b8f4b7729, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerJoinCourt
+  playerPrefab: {fileID: 4094594771929142560, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
   squareSpawnPoints:
   - {fileID: 2008517659}
   - {fileID: 1693275172}
