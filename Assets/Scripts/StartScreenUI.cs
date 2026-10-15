@@ -1,7 +1,10 @@
+
+using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+
 public class StartScreenUI : MonoBehaviour
 {
     [Header("Buttons")]
@@ -10,48 +13,43 @@ public class StartScreenUI : MonoBehaviour
     [SerializeField] private Button quitButton;
     [SerializeField] private Button createRoomBackButton;
     [SerializeField] private Button joinRoomBackButton;
+    [SerializeField] private Button joinRoomConfirmButton;
 
     [Header("Panels")]
     [SerializeField] private GameObject startScreenPanel;
     [SerializeField] private GameObject createRoomPanel;
     [SerializeField] private GameObject joinRoomPanel;
 
+    [Header("Multiplayer Lobby")]
+    [SerializeField] private GameObject roomLobbyPanel;
+
     [Header("VR Menu Placement")]
     [SerializeField] private Transform playerCamera;
     [SerializeField] private Transform menuCanvas;
-
-    // Distance of the menu from the player's headset.
     [SerializeField] private float menuDistance = 2f;
-
-    // Moves the menu slightly above eye level.
     [SerializeField] private float menuHeightOffset = 0.15f;
 
     [Header("Room Creation")]
     [SerializeField] private RoomCodeManager roomCodeManager;
     [SerializeField] private TMP_Text roomCodeText;
 
+    [Header("Join Room")]
+    [SerializeField] private TMP_InputField roomCodeInputField;
+
+    [Header("Multiplayer")]
+    [SerializeField] private MultiplayerRoomManager multiplayerRoomManager;
+
+    private string currentRoomCode;
+    private bool isConnecting = false;
+
     private IEnumerator Start()
     {
-        // Hide all UI panels while XR tracking initializes.
-        // This prevents the menu from briefly appearing
-        // backwards before it is positioned correctly.
-        if (startScreenPanel != null)
-            startScreenPanel.SetActive(false);
+        // Hide all panels while XR tracking initializes.
+        SetAllPanelsInactive();
 
-        if (createRoomPanel != null)
-            createRoomPanel.SetActive(false);
-
-        if (joinRoomPanel != null)
-            joinRoomPanel.SetActive(false);
-
-        // Give Quest/XR tracking time to establish
-        // the correct headset position and direction.
         yield return new WaitForSeconds(0.5f);
 
-        // Position the canvas once in front of the player.
         CenterMenuInFrontOfPlayer();
-
-        // Show only the main Start Screen.
         ShowStartScreen();
     }
 
@@ -71,6 +69,9 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomBackButton != null)
             joinRoomBackButton.onClick.AddListener(OnBackClicked);
+
+        if (joinRoomConfirmButton != null)
+            joinRoomConfirmButton.onClick.AddListener(OnJoinRoomConfirmed);
     }
 
     private void OnDisable()
@@ -89,21 +90,65 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomBackButton != null)
             joinRoomBackButton.onClick.RemoveListener(OnBackClicked);
+
+        if (joinRoomConfirmButton != null)
+            joinRoomConfirmButton.onClick.RemoveListener(OnJoinRoomConfirmed);
     }
 
-    private void ShowStartScreen()
+    private void SetAllPanelsInactive()
     {
-        // Only change which panel is visible.
-        // Do NOT reposition the canvas here.
-
         if (startScreenPanel != null)
-            startScreenPanel.SetActive(true);
+            startScreenPanel.SetActive(false);
 
         if (createRoomPanel != null)
             createRoomPanel.SetActive(false);
 
         if (joinRoomPanel != null)
             joinRoomPanel.SetActive(false);
+
+        if (roomLobbyPanel != null)
+            roomLobbyPanel.SetActive(false);
+    }
+
+    private void ShowStartScreen()
+    {
+        SetAllPanelsInactive();
+
+        if (startScreenPanel != null)
+            startScreenPanel.SetActive(true);
+    }
+
+    private void ShowCreateRoomPanel()
+    {
+        SetAllPanelsInactive();
+
+        if (createRoomPanel != null)
+            createRoomPanel.SetActive(true);
+    }
+
+    private void ShowJoinRoomPanel()
+    {
+        SetAllPanelsInactive();
+
+        if (joinRoomPanel != null)
+            joinRoomPanel.SetActive(true);
+    }
+
+    private void ShowLobby()
+    {
+        SetAllPanelsInactive();
+
+        if (roomLobbyPanel != null)
+        {
+            roomLobbyPanel.SetActive(true);
+            Debug.Log("Multiplayer lobby opened.");
+        }
+        else
+        {
+            Debug.LogError(
+                "RoomLobbyPanel is not assigned in StartScreenUI."
+            );
+        }
     }
 
     private void CenterMenuInFrontOfPlayer()
@@ -111,8 +156,6 @@ public class StartScreenUI : MonoBehaviour
         if (playerCamera == null || menuCanvas == null)
             return;
 
-        // Get the horizontal direction the headset is facing.
-        // Removing the vertical component keeps the menu upright.
         Vector3 forward = Vector3.ProjectOnPlane(
             playerCamera.forward,
             Vector3.up
@@ -123,59 +166,211 @@ public class StartScreenUI : MonoBehaviour
 
         forward.Normalize();
 
-        // Position the menu directly in front of the headset.
         Vector3 targetPosition =
-            playerCamera.position + (forward * menuDistance);
+            playerCamera.position + forward * menuDistance;
 
-        // Position the menu slightly above eye level.
         targetPosition.y =
             playerCamera.position.y + menuHeightOffset;
 
         menuCanvas.position = targetPosition;
 
-        // Orient the canvas correctly so the text is readable.
         menuCanvas.rotation = Quaternion.LookRotation(
             forward,
             Vector3.up
         );
     }
 
-    private void OnCreateRoomClicked()
-{
-    if (startScreenPanel != null)
-        startScreenPanel.SetActive(false);
-
-    if (joinRoomPanel != null)
-        joinRoomPanel.SetActive(false);
-
-    if (createRoomPanel != null)
-        createRoomPanel.SetActive(true);
-
-    // Generate and display a unique 4-letter room code.
-    if (roomCodeManager != null && roomCodeText != null)
+    private async void OnCreateRoomClicked()
     {
-        string roomCode = roomCodeManager.CreateUniqueRoomCode();
-        roomCodeText.text = "ROOM CODE: " + roomCode;
+        if (isConnecting)
+            return;
+
+        if (roomCodeManager == null ||
+            multiplayerRoomManager == null)
+        {
+            Debug.LogError(
+                "RoomCodeManager or MultiplayerRoomManager is missing."
+            );
+            return;
+        }
+
+        // If already connected, reopen the existing lobby.
+        if (multiplayerRoomManager.IsConnected)
+        {
+            currentRoomCode =
+                multiplayerRoomManager.CurrentRoomCode;
+
+            ShowLobby();
+            return;
+        }
+
+        isConnecting = true;
+
+        if (createRoomButton != null)
+            createRoomButton.interactable = false;
+
+        try
+        {
+            // Generate a candidate four-letter room code.
+            string code =
+                roomCodeManager.CreateUniqueRoomCode();
+
+            bool success =
+                await multiplayerRoomManager.CreateRoom(code);
+
+            if (success)
+            {
+                currentRoomCode = code;
+
+                DisplayRoomCode(code);
+
+                Debug.Log("Room created: " + code);
+
+                // Open the multiplayer lobby.
+                ShowLobby();
+            }
+            else
+            {
+                Debug.LogError(
+                    "Unable to create Photon room. " +
+                    "Check the Console for details."
+                );
+            }
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError(
+                "Create Room error: " + exception.Message
+            );
+        }
+        finally
+        {
+            isConnecting = false;
+
+            if (createRoomButton != null)
+                createRoomButton.interactable = true;
+        }
     }
-}
-    
+
+    private void DisplayRoomCode(string code)
+    {
+        if (roomCodeText != null)
+            roomCodeText.text = "ROOM CODE: " + code;
+    }
 
     private void OnJoinRoomClicked()
     {
-        if (startScreenPanel != null)
-            startScreenPanel.SetActive(false);
+        if (isConnecting)
+            return;
 
-        if (createRoomPanel != null)
-            createRoomPanel.SetActive(false);
+        if (multiplayerRoomManager != null &&
+            multiplayerRoomManager.IsConnected)
+        {
+            ShowLobby();
+            return;
+        }
 
-        if (joinRoomPanel != null)
-            joinRoomPanel.SetActive(true);
+        ShowJoinRoomPanel();
+
+        if (roomCodeInputField != null)
+            roomCodeInputField.text = "";
+    }
+
+    private async void OnJoinRoomConfirmed()
+    {
+        if (isConnecting)
+            return;
+
+        if (multiplayerRoomManager == null ||
+            roomCodeInputField == null)
+        {
+            Debug.LogError(
+                "MultiplayerRoomManager or RoomCodeInputField is missing."
+            );
+            return;
+        }
+
+        string code = roomCodeInputField.text
+            .Trim()
+            .ToUpperInvariant();
+
+        // Validate the four-letter code.
+        if (code.Length != 4)
+        {
+            Debug.LogWarning(
+                "Please enter exactly four letters."
+            );
+            return;
+        }
+
+        foreach (char letter in code)
+        {
+            if (letter < 'A' || letter > 'Z')
+            {
+                Debug.LogWarning(
+                    "Room code must contain only A-Z."
+                );
+                return;
+            }
+        }
+
+        isConnecting = true;
+
+        if (joinRoomConfirmButton != null)
+            joinRoomConfirmButton.interactable = false;
+
+        try
+        {
+            bool success =
+                await multiplayerRoomManager.JoinRoom(code);
+
+            if (success)
+            {
+                currentRoomCode = code;
+
+                Debug.Log(
+                    "Successfully joined room: " + code
+                );
+
+                // Show the lobby after joining.
+                ShowLobby();
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "Could not join room. " +
+                    "Check the room code or availability."
+                );
+            }
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError(
+                "Join Room error: " + exception.Message
+            );
+        }
+        finally
+        {
+            isConnecting = false;
+
+            if (joinRoomConfirmButton != null)
+                joinRoomConfirmButton.interactable = true;
+        }
     }
 
     private void OnBackClicked()
     {
-        // Return to the Start Screen without
-        // repositioning the canvas.
+        if (isConnecting)
+            return;
+
+        // Back changes panels but does not disconnect.
+        ShowStartScreen();
+    }
+
+    // Called by RoomLobbyUI after successfully leaving.
+    public void ReturnToStartScreen()
+    {
+        currentRoomCode = null;
         ShowStartScreen();
     }
 
