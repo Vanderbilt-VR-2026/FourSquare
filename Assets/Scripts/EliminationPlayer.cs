@@ -118,6 +118,16 @@ public class EliminationPlayer : NetworkBehaviour
             GameStateManager.Instance.OnPlayerRoleChanged -= HandleRoleChanged;
         }
 
+        UnsubscribeTriggerActions();
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeTriggerActions();
+    }
+
+    private void UnsubscribeTriggerActions()
+    {
         foreach (InputAction action in subscribedTriggerActions)
         {
             action.performed -= HandleTriggerPerformed;
@@ -254,7 +264,7 @@ public class EliminationPlayer : NetworkBehaviour
 
     private void HandleTriggerPerformed(InputAction.CallbackContext context)
     {
-        if (!Object.HasInputAuthority)
+        if (!isActiveAndEnabled || Object == null || !Object.IsValid || !Object.HasInputAuthority)
         {
             return;
         }
@@ -264,6 +274,15 @@ public class EliminationPlayer : NetworkBehaviour
 
     private void RequestElimination()
     {
+        if (Object == null
+            || !Object.IsValid
+            || !Object.HasInputAuthority
+            || NetworkRole == SquareRole.Spectator
+            || !System.Enum.IsDefined(typeof(SquareRole), NetworkRole))
+        {
+            return;
+        }
+
         if (Time.unscaledTime < nextEliminationRequestTime)
         {
             return;

@@ -14,8 +14,12 @@ public class EliminationTeleportation : NetworkBehaviour
 
     public void Eliminate(EliminationPlayer player)
     {
-        if (!Object.HasStateAuthority ||
-            player == null ||
+        if (player == null ||
+            player.Object == null ||
+            !player.Object.IsValid ||
+            !player.Object.HasStateAuthority ||
+            player.NetworkRole == SquareRole.Spectator ||
+            !System.Enum.IsDefined(typeof(SquareRole), player.NetworkRole) ||
             eliminationInProgress ||
             GameStateManager.Instance == null)
         {
@@ -37,7 +41,21 @@ public class EliminationTeleportation : NetworkBehaviour
         EliminationPlayer[] players = FindObjectsByType<EliminationPlayer>(FindObjectsSortMode.None);
         foreach (EliminationPlayer player in players)
         {
-            player.TeleportNetworkPlayer(GetSpawnPoint(player.NetworkRole));
+            if (player == null
+                || !System.Enum.IsDefined(typeof(SquareRole), player.NetworkRole)
+                || player.NetworkRole == SquareRole.Spectator)
+            {
+                continue;
+            }
+
+            Transform spawnPoint = GetSpawnPoint(player.NetworkRole);
+            if (spawnPoint == null)
+            {
+                Debug.LogError($"No spawn point is configured for the {player.NetworkRole} role.", this);
+                continue;
+            }
+
+            player.TeleportNetworkPlayer(spawnPoint);
         }
     }
 

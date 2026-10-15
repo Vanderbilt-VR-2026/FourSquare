@@ -1,7 +1,9 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Fusion;
 
-public class BallController : MonoBehaviour
+[RequireComponent(typeof(NetworkObject))]
+public class BallController : NetworkBehaviour
 {
     [Header("Ball Colliders")]
     [SerializeField] private SphereCollider physicalCollider;
@@ -15,7 +17,9 @@ public class BallController : MonoBehaviour
     [SerializeField] private float hitStrength = 1.5f;
     [SerializeField] private float minimumHandSpeed = 0.5f;
     [SerializeField] private float minimumHitVelocity = 1.5f;
-    [SerializeField] private float maximumHitVelocity = 8f;
+    [SerializeField] private float maximumHitVelocity = 6f;
+    [SerializeField, Min(0f)] private float maximumAngularVelocity = 12f;
+    [SerializeField, Min(0f)] private float linearDamping = 0.15f;
     [SerializeField] private float hitCooldown = 0.2f;
     [Range(0f, 1f)]
     [SerializeField] private float awayDirectionBlend = 0.15f;
@@ -29,8 +33,16 @@ public class BallController : MonoBehaviour
     private Vector3 originalVisualScale;
     private Vector3 visualImpactScale;
     private float squashTimer;
+    private Renderer[] ballRenderers;
+
+    [Networked] public Vector3 NetworkPosition { get; set; }
+    [Networked] public Quaternion NetworkRotation { get; set; }
+    [Networked] public NetworkBool NetworkGameStarted { get; set; }
 
     public float CatchRadius => catchRadius;
+    public bool IsNetworked => Object != null && Object.IsValid;
+    public bool HasGameplayAuthority => !IsNetworked || Object.HasStateAuthority;
+    public bool IsGameStarted => IsNetworked && NetworkGameStarted;
 
     private void Awake()
     {
@@ -38,6 +50,7 @@ public class BallController : MonoBehaviour
         {
             ballRigidbody = GetComponent<Rigidbody>();
         }
+        ConfigureBallPhysics();
 
         if (physicalCollider == null || catchZone == null)
         {
@@ -54,6 +67,7 @@ public class BallController : MonoBehaviour
         }
 
         ConfigureCatchZone();
+        ballRenderers = GetComponentsInChildren<Renderer>(true);
 
         if (ballVisual != null)
         {
@@ -71,6 +85,15 @@ public class BallController : MonoBehaviour
 
         catchZone.isTrigger = true;
         catchZone.radius = catchRadius;
+    }
+
+    private void ConfigureBallPhysics()
+    {
+        if (ballRigidbody == null) return;
+
+        ballRigidbody.linearDamping = linearDamping;
+        ballRigidbody.maxAngularVelocity = maximumAngularVelocity;
+        ballRigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
     }
 
     private void OnTriggerEnter(Collider other)
@@ -93,6 +116,8 @@ public class BallController : MonoBehaviour
 
     private void TryHit(BallHandMarker hand)
     {
+        if (IsNetworked && !NetworkGameStarted) return;
+
         if (lastHitTimes.TryGetValue(hand, out float lastHitTime) && Time.time < lastHitTime + hitCooldown)
         {
             return;
@@ -115,16 +140,156 @@ public class BallController : MonoBehaviour
         Vector3 handDirection = handVelocity.normalized;
         Vector3 launchDirection = Vector3.Slerp(handDirection, awayFromHand, awayDirectionBlend).normalized;
         float launchSpeed = Mathf.Clamp(inwardSpeed * hitStrength, minimumHitVelocity, maximumHitVelocity);
-        ballRigidbody.AddForce(launchDirection * launchSpeed, ForceMode.Impulse);
-        ballRigidbody.linearVelocity = Vector3.ClampMagnitude(ballRigidbody.linearVelocity, maximumHitVelocity);
         lastHitTimes[hand] = Time.time;
+
+        if (IsNetworked)
+        {
+            RPC_RequestHit(launchDirection, launchSpeed, (int)hand.PlayerRole);
+        }
+        else
+        {
+            ApplyHit(launchDirection, launchSpeed, hand.PlayerRole, hand.gameObject);
+        }
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    public void RPC_RequestHit(Vector3 launchDirection, float launchSpeed, int playerRole)
+    {
+        if (IsNetworked && !NetworkGameStarted) return;
+        if (!System.Enum.IsDefined(typeof(SquareRole), playerRole)) return;
+        ApplyHit(launchDirection, launchSpeed, (SquareRole)playerRole, null);
+    }
+
+    public void RequestStartGame()
+    {
+        if (IsNetworked)
+        {
+            Debug.Log($"[FourSquare] Start request sent to ball authority. Local state authority: {Object.HasStateAuthority}.",
+                this);
+            if (Object.HasStateAuthority)
+            {
+                BeginGame(false);
+                return;
+            }
+
+            RPC_RequestStartGame();
+            return;
+        }
+
+        Debug.Log("[FourSquare] Starting local, non-networked game.", this);
+        BeginGame(false);
+    }
+
+    public bool StartGameFromManager(bool startingRolesAssigned)
+    {
+        return BeginGame(startingRolesAssigned);
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    public void RPC_RequestStartGame()
+    {
+        Debug.Log($"[FourSquare] State Authority received game-start RPC. Started: {NetworkGameStarted}.", this);
+        if (NetworkGameStarted) return;
+        BeginGame(false);
+    }
+
+    private bool BeginGame(bool startingRolesAssigned)
+    {
+        if (IsNetworked && !Object.HasStateAuthority)
+        {
+            Debug.LogWarning("[FourSquare] Ignored game start because this client is not State Authority.", this);
+            return false;
+        }
+        if (IsNetworked && NetworkGameStarted)
+        {
+            Debug.Log("[FourSquare] Ignored duplicate game-start request.", this);
+            return false;
+        }
+
+        GameStateManager stateManager = GameStateManager.Instance;
+        if (IsNetworked && !startingRolesAssigned
+            && (stateManager == null || !stateManager.AssignStartingRoles()))
+        {
+            Debug.LogError("Four Square start was rejected because starting roles could not be assigned.", this);
+            return false;
+        }
+
+        Vector3 startPosition = stateManager != null && stateManager.BallSpawnPoint != null
+            ? stateManager.BallSpawnPoint.position
+            : transform.position;
+        Quaternion startRotation = stateManager != null && stateManager.BallSpawnPoint != null
+            ? stateManager.BallSpawnPoint.rotation
+            : transform.rotation;
+        if (PlayerJoinCourt.TryGetKingBallSpawnPose(out Vector3 kingPosition, out Quaternion kingRotation))
+        {
+            startPosition = kingPosition;
+            startRotation = kingRotation;
+        }
+
+        transform.SetPositionAndRotation(startPosition, startRotation);
+        Physics.SyncTransforms();
+        if (ballRigidbody != null)
+        {
+            ballRigidbody.linearVelocity = Vector3.zero;
+            ballRigidbody.angularVelocity = Vector3.zero;
+            ballRigidbody.isKinematic = false;
+            ballRigidbody.useGravity = true;
+        }
+        else
+        {
+            Debug.LogError("The game ball has no Rigidbody, so it cannot drop when the game starts.", this);
+            return false;
+        }
+
+        if (IsNetworked)
+        {
+            NetworkGameStarted = true;
+            NetworkPosition = transform.position;
+            NetworkRotation = transform.rotation;
+        }
+
+        SetBallVisible(true);
+        stateManager?.ApplyNetworkGameStarted();
+        Debug.Log($"[FourSquare] Game start completed. Ball released at {transform.position}.", this);
+        return true;
+    }
+
+    private void ApplyHit(Vector3 launchDirection, float launchSpeed, SquareRole playerRole, GameObject carrier)
+    {
+        if (IsNetworked && !Object.HasStateAuthority) return;
+        if (launchDirection.sqrMagnitude < 0.0001f) return;
+
+        launchSpeed = Mathf.Clamp(launchSpeed, minimumHitVelocity, maximumHitVelocity);
+        ballRigidbody.AddForce(launchDirection.normalized * launchSpeed, ForceMode.Impulse);
+        ballRigidbody.linearVelocity = Vector3.ClampMagnitude(ballRigidbody.linearVelocity, maximumHitVelocity);
         TriggerSquash(launchDirection);
 
-        if (GameStateManager.Instance != null)
+        GameStateManager stateManager = GameStateManager.Instance;
+        if (stateManager != null)
         {
-            GameStateManager.Instance.SetBallCarrier(hand.gameObject, hand.PlayerRole);
-            GameStateManager.Instance.SetBallInPlay(true);
+            stateManager.SetBallCarrier(carrier, playerRole);
+            stateManager.SetBallInPlay(true);
         }
+
+        if (IsNetworked) RPC_NotifyBallHit((int)playerRole);
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_NotifyBallHit(int playerRole)
+    {
+        if (Object.HasStateAuthority) return;
+        if (!System.Enum.IsDefined(typeof(SquareRole), playerRole)) return;
+
+        GameStateManager.Instance?.ApplyNetworkBallHit((SquareRole)playerRole);
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_NotifyBallOut(int responsibleRole)
+    {
+        if (Object.HasStateAuthority) return;
+        if (!System.Enum.IsDefined(typeof(SquareRole), responsibleRole)) return;
+
+        GameStateManager.Instance?.ApplyNetworkBallOut((SquareRole)responsibleRole);
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -132,6 +297,91 @@ public class BallController : MonoBehaviour
         if (collision.contactCount > 0)
         {
             TriggerSquash(collision.GetContact(0).normal);
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        if (IsNetworked) return;
+
+        if (ballRigidbody != null)
+        {
+            ballRigidbody.linearVelocity = Vector3.ClampMagnitude(
+                ballRigidbody.linearVelocity, maximumHitVelocity);
+        }
+
+        GameStateManager stateManager = GameStateManager.Instance;
+        if (stateManager != null && stateManager.IsBallInPlay && PlayerJoinCourt.IsBallOutsideCourt(transform.position))
+        {
+            stateManager.HandleBallOutsideCourt();
+        }
+    }
+
+    public override void Spawned()
+    {
+        if (ballRenderers == null || ballRenderers.Length == 0)
+        {
+            ballRenderers = GetComponentsInChildren<Renderer>(true);
+        }
+
+        if (ballRigidbody == null) ballRigidbody = GetComponent<Rigidbody>();
+        ConfigureBallPhysics();
+        if (Object.HasStateAuthority)
+        {
+            NetworkGameStarted = false;
+        }
+
+        if (ballRigidbody != null)
+        {
+            ballRigidbody.isKinematic = !NetworkGameStarted;
+            ballRigidbody.useGravity = NetworkGameStarted;
+        }
+
+        if (Object.HasStateAuthority)
+        {
+            NetworkPosition = transform.position;
+            NetworkRotation = transform.rotation;
+        }
+        else if (ballRigidbody != null)
+        {
+            ballRigidbody.isKinematic = true;
+        }
+
+        SetBallVisible(NetworkGameStarted);
+    }
+
+    public override void FixedUpdateNetwork()
+    {
+        if (Object.HasStateAuthority)
+        {
+            if (ballRigidbody != null)
+            {
+                ballRigidbody.linearVelocity = Vector3.ClampMagnitude(
+                    ballRigidbody.linearVelocity, maximumHitVelocity);
+            }
+
+            NetworkPosition = transform.position;
+            NetworkRotation = transform.rotation;
+
+            GameStateManager stateManager = GameStateManager.Instance;
+            if (stateManager != null && stateManager.IsBallInPlay && PlayerJoinCourt.IsBallOutsideCourt(transform.position))
+            {
+                stateManager.HandleBallOutsideCourt();
+            }
+        }
+    }
+
+    public override void Render()
+    {
+        if (IsNetworked && !Object.HasStateAuthority)
+        {
+            transform.SetPositionAndRotation(NetworkPosition, NetworkRotation);
+        }
+
+        if (NetworkGameStarted)
+        {
+            SetBallVisible(true);
+            GameStateManager.Instance?.ApplyNetworkGameStarted();
         }
     }
 
@@ -175,6 +425,16 @@ public class BallController : MonoBehaviour
         squashTimer = Mathf.Max(0.01f, squashDuration);
     }
 
+    private void SetBallVisible(bool visible)
+    {
+        if (ballRenderers == null) return;
+
+        foreach (Renderer ballRenderer in ballRenderers)
+        {
+            if (ballRenderer != null) ballRenderer.enabled = visible;
+        }
+    }
+
     private void OnValidate()
     {
         catchRadius = Mathf.Max(0.01f, catchRadius);
@@ -182,9 +442,12 @@ public class BallController : MonoBehaviour
         minimumHandSpeed = Mathf.Max(0f, minimumHandSpeed);
         minimumHitVelocity = Mathf.Max(0f, minimumHitVelocity);
         maximumHitVelocity = Mathf.Max(minimumHitVelocity, maximumHitVelocity);
+        maximumAngularVelocity = Mathf.Max(0f, maximumAngularVelocity);
+        linearDamping = Mathf.Max(0f, linearDamping);
         hitCooldown = Mathf.Max(0f, hitCooldown);
         squashStrength = Mathf.Clamp01(squashStrength);
         squashDuration = Mathf.Max(0.01f, squashDuration);
+        ConfigureBallPhysics();
         ConfigureCatchZone();
     }
 

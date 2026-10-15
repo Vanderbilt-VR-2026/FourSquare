@@ -7,36 +7,38 @@ public class CourtSquare : MonoBehaviour
     public int squareID;
 
     private int bounceCount = 0;
-    
-    // Tracks which square the ball bounced in last across the entire court
-    private static CourtSquare lastActiveSquare = null;
+
+    private static CourtSquare lastActiveSquare;
 
     private void OnCollisionEnter(Collision collision)
     {
-        // Check if the object hitting the square is tagged as "Ball"
-        if (!collision.gameObject.CompareTag("Ball")) return;
+        BallController ball = collision.collider.GetComponentInParent<BallController>();
+        if (ball == null || !ball.HasGameplayAuthority) return;
 
-        // If the ball bounces in a DIFFERENT square, reset the old square's count
-        if (lastActiveSquare != this)
+        SquareRole squareRole = (SquareRole)squareID;
+        if (!System.Enum.IsDefined(typeof(SquareRole), squareRole) || squareRole == SquareRole.Spectator)
         {
-            if (lastActiveSquare != null)
-            {
-                lastActiveSquare.bounceCount = 0;
-            }
-            lastActiveSquare = this;
-            bounceCount = 0;
+            Debug.LogError($"CourtSquare on {name} has an invalid squareID: {squareID}.");
+            return;
         }
 
-        // Increment the bounce count for this specific square
-        bounceCount++;
-        Debug.Log($"Square {squareID} recorded bounce #{bounceCount}");
+        GameStateManager stateManager = GameStateManager.Instance;
+        if (stateManager != null && !stateManager.IsBallInPlay) return;
 
-        // Rule Check: 2 or more bounces means out
+        if (lastActiveSquare != null && lastActiveSquare != this)
+        {
+            lastActiveSquare.bounceCount = 0;
+        }
+
+        lastActiveSquare = this;
+        bounceCount++;
+
+        stateManager?.RegisterBallBounce(squareRole);
+
         if (bounceCount >= 2)
         {
-            // Out Function
-            
-            // Reset count to prevent spamming logs
+            Debug.Log($"Ball is out in {squareRole} after {bounceCount} bounces.");
+            stateManager?.HandleBallOut(squareRole);
             bounceCount = 0;
         }
     }

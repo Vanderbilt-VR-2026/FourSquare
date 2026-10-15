@@ -66,7 +66,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 93283cc169c7497478725c1154e66ab6, type: 2}
+  - {fileID: 2100000, guid: 95995e375d0ebcf44bccdb350959f77f, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -103,6 +103,7 @@ GameObject:
   - component: {fileID: 7396366840077207631}
   - component: {fileID: 837434839220053229}
   - component: {fileID: 7869541523813990923}
+  - component: {fileID: 5120154578535201304}
   m_Layer: 0
   m_Name: Ball
   m_TagString: Untagged
@@ -135,7 +136,7 @@ Rigidbody:
   m_GameObject: {fileID: 5025608827499203412}
   serializedVersion: 5
   m_Mass: 1
-  m_LinearDamping: 0
+  m_LinearDamping: 0.15
   m_AngularDamping: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
@@ -215,8 +216,34 @@ MonoBehaviour:
   minimumHandSpeed: 0.5
   minimumHitVelocity: 1.5
   maximumHitVelocity: 8
+  maximumAngularVelocity: 12
+  linearDamping: 0.15
   hitCooldown: 0.2
   awayDirectionBlend: 0.15
   ballVisual: {fileID: 3989726373372790981}
   squashStrength: 0.12
   squashDuration: 0.12
+  _NetworkPosition: {x: 0, y: 0, z: 0}
+  _NetworkRotation: {x: 0, y: 0, z: 0, w: 0}
+  _NetworkGameStarted:
+    RawValue: 0
+--- !u!114 &5120154578535201304
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5025608827499203412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
+  SortKey: 1808323596
+  SendPriority: 1
+  EnableInterpolation: 1
+  Flags: 262146
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: 7869541523813990923}
+  ForceRemoteRenderTimeframe: 0
