@@ -123,6 +123,12 @@ We also introduced a multiplayer lobby supporting four player slots, integrated 
 
 Together, these features expand the initial VR gameplay foundation into a connected multiplayer experience.
 
+## In Progress
+
+Implementing multiplayer ball networking using Photon Fusion. The current work includes authoritative ball spawning, network synchronization of ball movement, and networked hit handling so player interactions can update the ball across connected clients. A NetworkBallSpawner, Fusion bootstrap configuration, and VR auto-start support have been added to the BallTest scene.
+
+Remaining work: Verify prefab assignments and network configuration, test ball spawning and hit synchronization across multiple clients, and validate hit authority and collision behavior in multiplayer sessions.
+
 ## Current Development
 
 The intended gameplay flow is:
@@ -134,6 +140,10 @@ Room creation, joining, lobby updates, and leaving multiplayer sessions have bee
 ## Next Steps
 
 Future development will focus on completing the multiplayer gameplay loop, integrating elimination and teleportation with the actual Four Square rules, synchronizing ball interactions across players, verifying the four-player capacity, improving room-code lifecycle management, and connecting the lobby to the gameplay and end-screen systems.
+
+## Note on AI Usage
+
+Our team used GitHub Copilot in Visual Studio Code as a development aid throughout the project. We used it to help generate and explain code, troubleshoot errors, and explore potential implementations. All AI-generated suggestions were reviewed and tested by team members, who remained responsible for understanding, integrating, and validating the code within the project.
 
 ## Team Members
 
