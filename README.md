@@ -1,75 +1,145 @@
+# FourSquare VR — Sprint 2
 
-# FourSquare VR — Sprint 1
+## Project Overview
 
-FourSquare VR is a virtual reality recreation of the traditional Four Square game, developed for Meta Quest using Unity. The goal of the project is to create an interactive multiplayer VR experience where players can enter a Four Square court, interact with the ball using VR controllers, and create or join rooms to play with other players.
+FourSquare VR is a multiplayer virtual reality recreation of the traditional Four Square playground game, developed for Meta Quest using Unity. The game allows four players to compete on a virtual Four Square court, hitting a ball between squares while avoiding elimination. Players aim to advance through the squares and ultimately reach the highest-ranking position, known as the King.
 
-The project is developed using **Unity 6.3 LTS (6000.3.23f1)** with the **XR Interaction Toolkit** and is currently targeting **Meta Quest 3 / Android**.
+The goal of this project is to create an immersive multiplayer VR experience where players can interact naturally using VR controllers, create or join multiplayer rooms, and compete with other players in a shared virtual environment.
+
+The project is developed using **Unity 6.3 LTS**, **XR Interaction Toolkit**, **Photon Fusion**, and **Photon Vision**, targeting **Meta Quest 3 / Android**.
 
 ## Getting Started
 
 Open the project in Unity and load:
 
-`Assets/Scenes/MainScene.unity`
+`Assets/Scenes/StartScene.unity`
 
-The Main Scene contains the current VR player setup, Four Square environment, start-screen interface, game-state management, and gameplay components.
+The Start Scene contains the VR start-screen interface, multiplayer room creation and joining functionality, and the player lobby.
 
-For headset testing, connect a Meta Quest device with Developer Mode and USB debugging enabled, switch the Unity build platform to Android, and use **Build and Run**.
+For headset testing, connect a Meta Quest device with Developer Mode and USB debugging enabled, switch the Unity build platform to Android, ensure `StartScene` is the first enabled scene, and use **Build and Run**.
 
-## VR Controls and Interaction
+## Sprint 2 Overview
 
-The player uses the Quest controllers to interact with the VR environment.
+During Sprint 2, our team focused on expanding the foundation established in Sprint 1 by integrating multiplayer networking, improving VR interactions, and implementing the room management system.
 
-Controller interactions currently include pointing at and selecting world-space UI elements and interacting with gameplay objects. The project also includes the foundation for ball interaction and physics-based Four Square gameplay.
+A major milestone was installing and configuring Photon Fusion and Vision to support multiplayer functionality. We also developed scripts for player elimination and teleportation, allowing players to teleport when eliminated. Currently, this behavior is triggered by holding a controller trigger as a temporary testing mechanism.
 
-Unnecessary locomotion actions such as jumping and joystick-based movement/rotation have been removed from the current player setup so that players remain oriented toward the Four Square court during gameplay.
+Additionally, we implemented room-code generation, multiplayer room creation and joining, a four-player lobby interface, and an interactive VR keyboard. These improvements establish the foundation for connecting multiple players within the same virtual Four Square environment.
 
-## Start Screen and Room Creation
+## Photon Fusion and Networking
 
-Sprint 1 introduces a VR start-screen interface with the following options:
+Sprint 2 introduced Photon Fusion to support multiplayer communication and session management.
 
-- **Create Room**
-- **Join Room**
-- **Quit**
+The networking setup allows players to create and join multiplayer sessions using room codes. This provides the foundation for synchronizing players and gameplay interactions across different devices.
 
-The Create Room and Join Room interfaces include Back navigation to return to the main start screen.
+Photon Vision was also installed and configured as part of the project's networking-related development.
 
-Selecting **Create Room** generates a random four-letter room code, such as `FRJE`. Generated codes are checked against codes already generated during the current session to prevent local duplicates.
+## Room Creation and Four-Letter Codes
 
-The current room-code implementation is local. Multiplayer room registration and validation across different Quest devices will be integrated with the networking system in a later sprint.
+Players can select **Create Room** from the start screen to generate a random four-letter room code.
 
-## Game State and Environment
+The room-code system includes:
 
-Sprint 1 establishes the initial architecture required for Four Square gameplay.
+- Random four-letter room-code generation.
+- Local tracking of generated codes to avoid duplicates during the current session.
+- Displaying the generated room code in the Create Room interface.
+- Integration of room-code generation with the Create Room button.
+- Connecting generated room codes to Photon Fusion multiplayer sessions.
 
-The project includes a `GameStateManager` and supporting game-state types for tracking gameplay information. Graybox environments and the Four Square court have also been created to provide the foundation for gameplay development and testing.
+The local code-tracking system prevents duplicates within the current game instance. Additional validation is needed to guarantee uniqueness across all active multiplayer sessions.
 
-Ball hit, bounce, and physics mechanics have been developed as part of the initial gameplay interaction system.
+## Join Room Functionality
 
-## Sprint 1 Progress
+Players can select **Join Room** from the start screen and enter a four-letter room code to connect to an existing multiplayer session.
 
-During Sprint 1, the team focused on building the core VR foundation required for future multiplayer gameplay. Work completed during the sprint includes the initial VR scene and controller input, VR start-screen UI, Create Room and Join Room navigation, game-state management, graybox environments and Four Square court development, and initial ball hit and bounce mechanics.
+The Join Room system includes room-code validation, Photon Fusion session joining, and navigation between the Start Screen and Join Room interface.
 
-Additional Sprint 1 work includes integrating the gameplay ball into the main scene, developing the end-screen UI as a separate scene, and implementing four-letter room-code generation for the Create Room workflow.
+This functionality allows multiple players to connect to the same room using a shared code.
+
+## Multiplayer Lobby
+
+A multiplayer lobby was implemented to display the current room code, connected player count, and available player slots.
+
+The lobby supports a maximum configured capacity of four players.
+
+For example:
+
+**ROOM CODE: ABCD**
+
+**PLAYERS: 2/4**
+
+- Player 1 — Connected
+- Player 2 — Connected
+- Waiting for Player 3...
+- Waiting for Player 4...
+
+The lobby updates the player count as participants connect or disconnect, allowing players to see how many positions remain available.
+
+## VR Keyboard and User Interface Improvements
+
+To support room-code entry in virtual reality, we integrated the XR Interaction Toolkit Spatial Keyboard.
+
+Players can use their Quest controllers to select letters and enter room codes directly within the VR environment.
+
+We also improved the user interface by adjusting the keyboard position, aligning the Join and Back buttons, and ensuring that the keyboard appears when the room-code input field is selected.
+
+Additional UI improvements included organizing the multiplayer lobby, displaying connected-player information, and providing navigation between the different room screens.
+
+## Leave Room and Session Management
+
+The **Leave Room** functionality allows players to disconnect from the current Photon Fusion session and return to the Start Screen.
+
+When the host leaves, the hosted multiplayer session shuts down, preventing other players from joining the closed room.
+
+Further verification is needed for reusing released room codes and handling unexpected disconnections.
+
+## Player Elimination and Teleportation
+
+Sprint 2 also included development of scripts to support player elimination and teleportation during gameplay.
+
+When a player is eliminated, the system is designed to teleport them to an appropriate location in the game environment.
+
+Currently, the elimination and teleportation behavior uses holding a controller trigger as a temporary testing mechanism. This functionality is set up with networking and will be integrated with the actual Four Square elimination rules as gameplay development progresses.
+
+## Multiplayer Testing
+
+The multiplayer room system was tested using a Meta Quest headset as Player 1 and the Unity Editor on Mac as Player 2.
+
+Testing confirmed the following:
+
+- Successfully created a multiplayer room on Meta Quest.
+- Successfully joined the same room from Mac using the generated four-letter code.
+- Verified that the lobby updated from 1/4 to 2/4 connected players.
+- Verified that the Leave Room button returned the player to the Start Screen.
+- Verified that attempting to join the previous room failed after the host closed it.
+
+These tests demonstrated successful multiplayer room creation, joining, player-count updates, and session disconnection using Photon Fusion.
+
+## Sprint 2 Progress
+
+During Sprint 2, the team made significant progress toward a fully functional multiplayer FourSquare VR experience. We installed and configured Photon Fusion and Vision, developed networked elimination and teleportation scripts, implemented four-letter room-code generation, and connected room creation and joining to Photon Fusion sessions.
+
+We also introduced a multiplayer lobby supporting four player slots, integrated an XR Spatial Keyboard for VR text input, improved the user interface, and implemented Leave Room functionality.
+
+Together, these features expand the initial VR gameplay foundation into a connected multiplayer experience.
 
 ## Current Development
 
-The project currently provides the foundation for the complete Four Square gameplay loop:
+The intended gameplay flow is:
 
-`Start Screen → Create/Join Room → Four Square Game → End Screen`
+**Start Screen → Create/Join Room → Multiplayer Lobby → Four Square Game → End Screen**
 
-Some parts of this flow are still under development and integration. In particular, generated room codes are not yet connected to a shared multiplayer room registry.
+Room creation, joining, lobby updates, and leaving multiplayer sessions have been implemented and tested. Full gameplay integration, including synchronized player elimination and ball interactions, remains under development.
 
 ## Next Steps
 
-Future development will focus on connecting room creation and room-code entry to the multiplayer networking system, allowing multiple Quest users to join the same room, completing the player lobby flow, integrating the start/game/end scenes, and continuing development of the full Four Square gameplay experience.
+Future development will focus on completing the multiplayer gameplay loop, integrating elimination and teleportation with the actual Four Square rules, synchronizing ball interactions across players, verifying the four-player capacity, improving room-code lifecycle management, and connecting the lobby to the gameplay and end-screen systems.
 
+## Team Members
 
-
-| Team Member   | Major(s) | Relevant Skills | Responsibilities |
-| -------- | ------- | ------- | ------- | 
-| Helen Wu  | CS/Math | 3D modeling, Figma, Full-stack Development, Godot | Develop game assets, Backend development, Git repo manager |
-| Alfred Tapia | CS | VR, 3D modeling, Git, Full-stack Development | Develop game assets, Networking, Backend development |
-| Gwen Goetz | Vocal Performance | Git, Backend Development, Sound Design | Story/task management, Backend development, Networking |
-| Sreepriya Damuluru | CS | Full-stack Development, Git,  | Spring update submissions, Backend development |
-
-Four Square is a multiplayer playground game where four players are attempting to reach the highest level square (King). Players will be hitting a ball back and forth across the court, and they are avoiding elimination from missing the ball or hitting it out. 
+| Team Member | Major(s) | Relevant Skills | Responsibilities |
+|---|---|---|---|
+| Helen Wu | CS/Math | 3D Modeling, Figma, Full-stack Development, Godot | Game assets, backend development, Git repository management |
+| Alfred Tapia | CS | VR, 3D Modeling, Git, Full-stack Development | Game assets, networking, backend development |
+| Gwen Goetz | Vocal Performance | Git, Backend Development, Sound Design | Story/task management, backend development, networking |
+| Sreepriya Damuluru | CS | Full-stack Development, Git | Sprint updates, backend development, multiplayer room creation, joining, and lobby implementation |
