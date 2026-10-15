@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5931536195273062427}
   - component: {fileID: 350774810742917943}
   - component: {fileID: 9188102631058289230}
+  - component: {fileID: 979321705808114926}
   m_Layer: 0
   m_Name: VR Player
   m_TagString: Player
@@ -111,6 +112,7 @@ MonoBehaviour:
   NestedObjects: []
   NetworkedBehaviours:
   - {fileID: 9188102631058289230}
+  - {fileID: 979321705808114926}
   ForceRemoteRenderTimeframe: 0
 --- !u!114 &9188102631058289230
 MonoBehaviour:
@@ -142,6 +144,21 @@ MonoBehaviour:
   _NetworkRightHandRotation: {x: 0, y: 0, z: 0, w: 0}
   _NetworkHasXRTracking: 0
   _NetworkRole: 0
+--- !u!114 &979321705808114926
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992349184629936267}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 440788b760e1d2243bb25a213b9c6511, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EliminationPlayer
+  playerId: 
+  startingRole: 0
+  triggerAction: {fileID: -6131295136447488360, guid: c348712bda248c246b8c49b3db54643f, type: 3}
 --- !u!1 &1094145138487326133
 GameObject:
   m_ObjectHideFlags: 0
