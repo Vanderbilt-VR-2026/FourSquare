@@ -281,7 +281,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
   visualCubeSize: 0.12
-  visualMaterial: {fileID: 2100000, guid: 91ea7b756a2cb824fb2c84f3e073c5ab, type: 2}
+  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   playerRole: 0
 --- !u!1 &1324493728189623182
 GameObject:
@@ -349,7 +349,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 91ea7b756a2cb824fb2c84f3e073c5ab, type: 2}
+  - {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -495,7 +495,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
   visualCubeSize: 0.12
-  visualMaterial: {fileID: 2100000, guid: 91ea7b756a2cb824fb2c84f3e073c5ab, type: 2}
+  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   playerRole: 0
 --- !u!1 &2564747234580309914
 GameObject:
@@ -597,7 +597,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 91ea7b756a2cb824fb2c84f3e073c5ab, type: 2}
+  - {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
