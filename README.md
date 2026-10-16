@@ -10,6 +10,7 @@ The project is developed using **Unity 6.3 LTS**, **XR Interaction Toolkit**, **
 
 ## Getting Started
 
+### Option 1: PC Link (Build & Run):
 Open the project in Unity and load:
 
 `Assets/Scenes/StartScene.unity`
@@ -17,6 +18,26 @@ Open the project in Unity and load:
 The Start Scene contains the VR start-screen interface, multiplayer room creation and joining functionality, and the player lobby.
 
 For headset testing, connect a Meta Quest device with Developer Mode and USB debugging enabled, switch the Unity build platform to Android, ensure `StartScene` is the first enabled scene, and use **Build and Run**.
+
+### Option 2: Standalone Quest (File APK):
+Open the project on your file explorer and open:
+
+`Sprint2 Builds/StartScreen.apk`
+
+The Start Scene contains the VR start-screen interface, multiplayer room creation and joining functionality, and the player lobby.
+
+Connect the VR headset to your PC via USB and transfer the APK files to the device storage. Before installing, ensure any previous instances of Foursquare are completely uninstalled. Once transferred, locate and open the files on the headset to complete the installation.
+
+### Extras:
+Theres also more scenes that aren't connected to the startscreen.
+
+#### Builds
+`Assets/Scenes/BallTest.unity`
+`Assets/Scenes/EndScene.unity`
+
+#### APKs
+`Sprint2 Builds/BallTest.apk`
+`Sprint2 Builds/EndScreen.apk`
 
 ## Sprint 2 Overview
 
@@ -102,9 +123,9 @@ Further verification is needed for reusing released room codes and handling unex
 
 Sprint 2 also included development of scripts to support player elimination and teleportation during gameplay.
 
-When a player is eliminated, the system is designed to teleport them to an appropriate location in the game environment.
+When a player is eliminated, the system is designed to teleport them to an appropriate location in the game environment. However, this is still in progress as for right now it just deletes the vr player from the scene.
 
-Currently, the elimination and teleportation behavior uses holding a controller trigger as a temporary testing mechanism. This functionality is set up with networking and will be integrated with the actual Four Square elimination rules as gameplay development progresses.
+Currently, the elimination and teleportation behavior uses holding a controller button (B) as a temporary testing mechanism. This functionality is set up with networking and will be integrated with the actual Four Square elimination rules as gameplay development progresses.
 
 ## Multiplayer Testing
 
