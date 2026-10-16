@@ -38,7 +38,13 @@ Photon Vision was also installed and configured as part of the project's network
 
 Players can select **Create Room** from the start screen to generate a random four-letter room code.
 
+<<<<<<< HEAD
 The room-code system includes:
+=======
+Fusion networking is available for gameplay in the City scene. In Unity, run **FourSquare > Configure Fusion Gameplay** once to bake the XR player and ball prefabs, register them with Fusion, and add/configure the game manager and session bootstrap on the City court. Run this setup again if the City popup reports that no `GameStateManager` exists. The scene joins the shared session `FourSquareVR` automatically, with a four-player limit. All devices must use this same session name and load the City scene. In the court popup, aim either controller ray at a button to highlight it, then squeeze that controller's trigger. Any joined player can start the game: players are assigned King, Queen, Jack, and Peasant in Fusion join order, and the single shared ball drops into the King's square. **Exit Court** returns the player to the floor beside the court. The Create Room and Join Room panels are not yet connected to Fusion; they remain unchanged.
+
+## Game State and Environment
+>>>>>>> origin/main
 
 - Random four-letter room-code generation.
 - Local tracking of generated codes to avoid duplicates during the current session.
@@ -135,7 +141,11 @@ The intended gameplay flow is:
 
 **Start Screen → Create/Join Room → Multiplayer Lobby → Four Square Game → End Screen**
 
+<<<<<<< HEAD
 Room creation, joining, lobby updates, and leaving multiplayer sessions have been implemented and tested. Full gameplay integration, including synchronized player elimination and ball interactions, remains under development.
+=======
+Some parts of this flow are still under development and integration. In particular, the start-screen room panels do not yet select or create Fusion sessions, and generated room codes are not connected to a shared multiplayer room registry.
+>>>>>>> origin/main
 
 ## Next Steps
 

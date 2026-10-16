@@ -12,7 +12,7 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: DefaultCompany
+  companyName: Vanderbilt University
   productName: FourSquare
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
@@ -171,7 +171,7 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: com.UnityTechnologies.com.unity.template.urpblank
+    Android: com.VanderbiltUniversity.FourSquare
     Standalone: com.Unity-Technologies.com.unity.template.urp-blank
     iPhone: com.Unity-Technologies.com.unity.template.urp-blank
   buildNumber:
@@ -179,7 +179,7 @@ PlayerSettings:
     VisionOS: 0
     iPhone: 0
     tvOS: 0
-  overrideDefaultApplicationIdentifier: 1
+  overrideDefaultApplicationIdentifier: 0
   AndroidBundleVersionCode: 1
   AndroidMinSdkVersion: 25
   AndroidTargetSdkVersion: 0
@@ -846,7 +846,7 @@ PlayerSettings:
     PS5: FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_1;FUSION_2_1_3;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_2_1_OR_NEWER;FUSION_LOGLEVEL_INFO
     QNX: FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_1;FUSION_2_1_3;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_2_1_OR_NEWER;FUSION_LOGLEVEL_INFO
     Server: FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_1;FUSION_2_1_3;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_2_1_OR_NEWER;FUSION_LOGLEVEL_INFO
-    Standalone: USE_INPUT_SYSTEM_POSE_CONTROL;USE_STICK_CONTROL_THUMBSTICKS;FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_1;FUSION_2_1_3;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_2_1_OR_NEWER;FUSION_LOGLEVEL_INFO
+    Standalone: USE_INPUT_SYSTEM_POSE_CONTROL;USE_STICK_CONTROL_THUMBSTICKS;FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_1;FUSION_2_1_3;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_2_1_OR_NEWER;FUSION_LOGLEVEL_INFO;PHOTON_REALTIME_5_OR_NEWER
     VisionOS: FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_1;FUSION_2_1_3;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_2_1_OR_NEWER;FUSION_LOGLEVEL_INFO
     WebGL: FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_1;FUSION_2_1_3;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_2_1_OR_NEWER;FUSION_LOGLEVEL_INFO
     Windows Store Apps: USE_INPUT_SYSTEM_POSE_CONTROL;USE_STICK_CONTROL_THUMBSTICKS;FUSION_WEAVER;FUSION2;FUSION_2;FUSION_2_1;FUSION_2_1_3;FUSION_2_OR_NEWER;FUSION_2_0_OR_NEWER;FUSION_2_1_OR_NEWER;FUSION_LOGLEVEL_INFO

@@ -2382,6 +2382,10 @@ MonoBehaviour:
   lastSquareHit: 0
   lastTouchedByPlayerRole: 0
   isBallInPlay: 0
+  ballPrefab: {fileID: 0}
+  ballSpawnPoint: {fileID: 0}
+  ballSpawnDelay: 0.5
+  hasGameStarted: 0
   playerList: []
 --- !u!1 &1105218953
 GameObject:
@@ -4616,7 +4620,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f6373381a1be64819bdb9772166ea223, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Test
-  multiplayerRoomManager: {fileID: 1993663997}
 --- !u!114 &1660729400
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5611,6 +5614,8 @@ MonoBehaviour:
   menuCanvas: {fileID: 1893488806}
   menuDistance: 2
   menuHeightOffset: 0.15
+  fallbackCameraHeight: 1.6
+  trackingInitializationTimeout: 5
   roomCodeManager: {fileID: 1057470867}
   roomCodeText: {fileID: 1857968493}
   roomCodeInputField: {fileID: 628152953}
@@ -5796,6 +5801,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2cecea75b353d441a97e0a56dea4737d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MultiplayerRoomManager
+  maximumPlayers: 4
+  requiredPlayersCount: 2
+  cityScenePath: Assets/Scenes/City.unity
+  disableXRInEditor: 0
 --- !u!1 &2035984005
 GameObject:
   m_ObjectHideFlags: 0

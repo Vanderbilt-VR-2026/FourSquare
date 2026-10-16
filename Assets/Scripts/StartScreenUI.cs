@@ -28,6 +28,8 @@ public class StartScreenUI : MonoBehaviour
     [SerializeField] private Transform menuCanvas;
     [SerializeField] private float menuDistance = 2f;
     [SerializeField] private float menuHeightOffset = 0.15f;
+    [SerializeField] private float fallbackCameraHeight = 1.6f;
+    [SerializeField] private float trackingInitializationTimeout = 5f;
 
     [Header("Room Creation")]
     [SerializeField] private RoomCodeManager roomCodeManager;
@@ -44,13 +46,58 @@ public class StartScreenUI : MonoBehaviour
 
     private IEnumerator Start()
     {
-        // Hide all panels while XR tracking initializes.
         SetAllPanelsInactive();
 
-        yield return new WaitForSeconds(0.5f);
+        if (playerCamera == null || menuCanvas == null)
+        {
+            Debug.LogError("Player camera or menu canvas is not assigned in StartScreenUI.", this);
+            ShowStartScreen();
+            yield break;
+        }
 
-        CenterMenuInFrontOfPlayer();
+        Canvas canvas = menuCanvas.GetComponent<Canvas>();
+        if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
+        {
+            if (menuCanvas.GetComponent<GraphicRaycaster>() == null)
+                menuCanvas.gameObject.AddComponent<GraphicRaycaster>();
+
+            Camera eventCamera = playerCamera.GetComponent<Camera>();
+            if (eventCamera == null)
+                eventCamera = Camera.main;
+
+            if (eventCamera == null || !eventCamera.isActiveAndEnabled)
+            {
+                Debug.LogError(
+                    "The world-space start menu needs an enabled event camera. Assign an enabled camera " +
+                    "to Player Camera or tag it MainCamera.",
+                    this);
+                ShowStartScreen();
+                yield break;
+            }
+
+            canvas.worldCamera = eventCamera;
+        }
+
+        yield return new WaitForSecondsRealtime(0.5f);
+        bool hasTrackedHeadPose = HasTrackedHeadPose();
+        CenterMenuInFrontOfPlayer(hasTrackedHeadPose);
         ShowStartScreen();
+
+        if (hasTrackedHeadPose)
+            yield break;
+
+        float elapsed = 0f;
+        while (elapsed < trackingInitializationTimeout)
+        {
+            yield return null;
+            elapsed += Time.unscaledDeltaTime;
+
+            if (HasTrackedHeadPose())
+            {
+                CenterMenuInFrontOfPlayer(true);
+                yield break;
+            }
+        }
     }
 
     private void OnEnable()
@@ -151,7 +198,14 @@ public class StartScreenUI : MonoBehaviour
         }
     }
 
-    private void CenterMenuInFrontOfPlayer()
+    private bool HasTrackedHeadPose()
+    {
+        return UnityEngine.XR.XRSettings.isDeviceActive &&
+            playerCamera != null &&
+            playerCamera.position.y - playerCamera.root.position.y > 0.5f;
+    }
+
+    private void CenterMenuInFrontOfPlayer(bool useTrackedHeight)
     {
         if (playerCamera == null || menuCanvas == null)
             return;
@@ -169,8 +223,9 @@ public class StartScreenUI : MonoBehaviour
         Vector3 targetPosition =
             playerCamera.position + forward * menuDistance;
 
-        targetPosition.y =
-            playerCamera.position.y + menuHeightOffset;
+        targetPosition.y = useTrackedHeight
+            ? playerCamera.position.y + menuHeightOffset
+            : playerCamera.root.position.y + fallbackCameraHeight + menuHeightOffset;
 
         menuCanvas.position = targetPosition;
 
