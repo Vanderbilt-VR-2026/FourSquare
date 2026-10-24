@@ -8,7 +8,8 @@ public class BallController : NetworkBehaviour
     [Header("Ball Colliders")]
     [SerializeField] private SphereCollider physicalCollider;
     [SerializeField] private SphereCollider catchZone;
-    [SerializeField] private float catchRadius = 0.8f;
+    [Tooltip("Trigger radius used only to detect BallHandMarker components. It does not physically collide with the court.")]
+    [SerializeField] private float catchRadius = 0.15f;
 
     [Header("Ball Physics")]
     [SerializeField] private Rigidbody ballRigidbody;

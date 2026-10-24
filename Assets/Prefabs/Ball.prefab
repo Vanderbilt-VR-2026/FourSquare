@@ -210,7 +210,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallController
   physicalCollider: {fileID: 7396366840077207631}
   catchZone: {fileID: 837434839220053229}
-  catchRadius: 0.6096
+  catchRadius: 0.15
   ballRigidbody: {fileID: 4252656488524015188}
   hitStrength: 1.5
   minimumHandSpeed: 0.5
