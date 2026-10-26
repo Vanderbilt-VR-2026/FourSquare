@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &4823447596751488832
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8202425235324720781}
+  - component: {fileID: 5776588447741129300}
+  m_Layer: 0
+  m_Name: SkyBoxManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8202425235324720781
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4823447596751488832}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &5776588447741129300
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4823447596751488832}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 442511a910236d945b4654846465072b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'
+  middaySkybox: {fileID: 2100000, guid: 07bba42af31ee424a9876ac5cc588e72, type: 2}
+  eveningSkybox: {fileID: 2100000, guid: 3b5e5f436d99fa941bd1ade47742b5a3, type: 2}
+  midnightSkybox: {fileID: 2100000, guid: 84d8c638f0f33204abd9bed0632174a3, type: 2}
+  sunsetSkybox: {fileID: 2100000, guid: 217279ef8e19da84a80dc6a44b805db1, type: 2}
+  daybreakSkybox: {fileID: 2100000, guid: d5df5ed6c5984a3479e25684c0b2d709, type: 2}
+  daybreakStart: 5
+  middayStart: 8
+  sunsetStart: 17
+  eveningStart: 19
+  midnightStart: 21
