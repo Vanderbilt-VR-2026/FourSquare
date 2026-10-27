@@ -1,9 +1,12 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 
 /// <summary>
-/// Test-ball helper that launches a Rigidbody to a target selected by CourtTargetManager.
+/// Test-ball helper that launches a Rigidbody to a target sub-square selected by CourtTargetManager.
+/// If a hit is reasonably on target, physics propels it deterministically to the selected sub-square.
+/// If a hit is wildly mistimed or off, physics takes over and the ball flies off and is marked Out of Bounds.
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class BallTrajectoryController : MonoBehaviour
@@ -12,12 +15,16 @@ public class BallTrajectoryController : MonoBehaviour
     [SerializeField] private Rigidbody ballRigidbody;
     [SerializeField] private SphereCollider handHitZone;
 
+    [Header("Ball Reset")]
+    [SerializeField] private Vector3 initialDropPosition = new Vector3(0f, 2f, 0f);
+    [SerializeField] private float autoResetYThreshold = -4f;
+
     [Header("Test Strike")]
-    [SerializeField, Range(0, 3)] private int sourceSquare;
+    [SerializeField, Range(0, 3)] private int sourceSquare = 3;
     [SerializeField] private Vector3 horizontalStrikeDirection = Vector3.forward;
     [SerializeField, Min(0f)] private float swingSpeed = 6f;
-    [SerializeField, Min(0.1f)] private float flightTimePerWorldUnit = 0.12f;
-    [SerializeField, Min(0.05f)] private float minimumFlightTime = 0.35f;
+    [SerializeField, Min(0.05f)] private float flightTimePerWorldUnit = 0.15f;
+    [SerializeField, Min(0.05f)] private float minimumFlightTime = 0.4f;
     [SerializeField, Min(0.05f)] private float maximumFlightTime = 2f;
 
     [Header("Keyboard Test Input")]
@@ -25,12 +32,12 @@ public class BallTrajectoryController : MonoBehaviour
     [SerializeField] private KeyCode keyboardHandStrikeKey = KeyCode.F;
 
     [Header("Hand Test Input")]
-    [SerializeField, Min(0.01f)] private float handHitRadius = 0.9f;
+    [SerializeField, Min(0.01f)] private float handHitRadius = 0.3f;
     [SerializeField, Min(0f)] private float minimumHandSpeed = 0.5f;
     [SerializeField, Min(0f)] private float hitCooldown = 0.2f;
 
-    private readonly System.Collections.Generic.Dictionary<BallHandMarker, float> lastHitTimes =
-        new System.Collections.Generic.Dictionary<BallHandMarker, float>();
+    private readonly Dictionary<BallHandMarker, float> lastHitTimes =
+        new Dictionary<BallHandMarker, float>();
 
     private void Awake()
     {
@@ -47,12 +54,29 @@ public class BallTrajectoryController : MonoBehaviour
         ConfigureHandHitZone();
     }
 
+    private void Start()
+    {
+        ResetBall();
+    }
+
     private void Update()
     {
+        // Auto-reset if ball falls off the court
+        if (transform.position.y < autoResetYThreshold)
+        {
+            ResetBall();
+            return;
+        }
+
         Keyboard keyboard = Keyboard.current;
         if (keyboard == null)
         {
             return;
+        }
+
+        if (keyboard.rKey.wasPressedThisFrame)
+        {
+            ResetBall();
         }
 
         if (keyboard.digit1Key.wasPressedThisFrame || keyboard.numpad1Key.wasPressedThisFrame) sourceSquare = 0;
@@ -90,6 +114,21 @@ public class BallTrajectoryController : MonoBehaviour
         return control != null && control.wasPressedThisFrame;
     }
 
+    [ContextMenu("Reset Ball")]
+    public void ResetBall()
+    {
+        if (ballRigidbody != null)
+        {
+            ballRigidbody.linearVelocity = Vector3.zero;
+            ballRigidbody.angularVelocity = Vector3.zero;
+            ballRigidbody.isKinematic = false;
+            ballRigidbody.constraints = RigidbodyConstraints.None;
+            transform.position = initialDropPosition;
+            ballRigidbody.WakeUp();
+            Debug.Log($"[BallTrajectoryController] Ball reset to {initialDropPosition}.", this);
+        }
+    }
+
     [ContextMenu("Strike Test Ball")]
     public void StrikeTestBall()
     {
@@ -99,15 +138,22 @@ public class BallTrajectoryController : MonoBehaviour
             return;
         }
 
-        if (!courtTargetManager.TryGetTarget(sourceSquare, transform.position,
-            horizontalStrikeDirection, swingSpeed, out CourtTargetManager.TargetSelection selection))
-        {
-            Debug.LogWarning($"Strike marked Out of Bounds: {selection.failureReason}", this);
-            return;
-        }
+        int currentSquare = courtTargetManager.GetSquareFromPosition(transform.position);
+        CourtTargetManager.TargetSelection selection = default;
 
-        LaunchAt(selection.position);
-        Debug.Log($"Launched toward square {selection.targetSquare}, column {selection.column}, row {selection.row}.", this);
+        if (courtTargetManager.TryGetTarget(currentSquare, transform.position,
+            horizontalStrikeDirection, swingSpeed, out selection))
+        {
+            LaunchAt(selection.position, transform.position);
+            Debug.Log($"[BallTrajectoryController] Launched toward square {selection.targetSquare}, column {selection.column}, row {selection.row}.", this);
+        }
+        else
+        {
+            // Wild hit: launch off with physics and mark out of bounds
+            Vector3 wildVelocity = horizontalStrikeDirection.normalized * swingSpeed + Vector3.up * 2f;
+            LaunchOutOfBounds(wildVelocity);
+            Debug.LogWarning($"[BallTrajectoryController] Strike marked Out of Bounds: {selection.failureReason}. Ball flying off with physics.", this);
+        }
     }
 
     public bool TryLaunch(Vector3 strikeOrigin, Vector3 strikeDirection, float strikeSpeed, int launchingSquare)
@@ -118,15 +164,18 @@ public class BallTrajectoryController : MonoBehaviour
             return false;
         }
 
-        if (!courtTargetManager.TryGetTarget(launchingSquare, strikeOrigin, strikeDirection,
-            strikeSpeed, out CourtTargetManager.TargetSelection selection))
+        CourtTargetManager.TargetSelection selection = default;
+        if (courtTargetManager.TryGetTarget(launchingSquare, strikeOrigin, strikeDirection,
+            strikeSpeed, out selection))
         {
-            Debug.LogWarning($"Strike marked Out of Bounds: {selection.failureReason}", this);
-            return false;
+            LaunchAt(selection.position, strikeOrigin);
+            return true;
         }
 
-        LaunchAt(selection.position, strikeOrigin);
-        return true;
+        Vector3 wildVelocity = strikeDirection.normalized * strikeSpeed + Vector3.up * 1.5f;
+        LaunchOutOfBounds(wildVelocity);
+        Debug.LogWarning($"[BallTrajectoryController] Strike marked Out of Bounds: {selection.failureReason}. Ball flying off with physics.", this);
+        return false;
     }
 
     private void OnTriggerEnter(Collider other)
@@ -154,17 +203,61 @@ public class BallTrajectoryController : MonoBehaviour
         }
 
         Vector3 strikeDirection = Vector3.ProjectOnPlane(hand.Velocity, Vector3.up);
-        if (strikeDirection.sqrMagnitude < 0.0001f)
+        float strikeSpeed = hand.Velocity.magnitude;
+
+        if (courtTargetManager == null)
         {
-            return;
+            courtTargetManager = FindFirstObjectByType<CourtTargetManager>();
         }
 
-        float strikeSpeed = Mathf.Clamp(hand.Velocity.magnitude, minimumHandSpeed,
-            courtTargetManager != null ? courtTargetManager.MaximumSwingSpeed : swingSpeed);
-        if (TryLaunch(transform.position, strikeDirection, strikeSpeed, sourceSquare))
+        int currentSquare = courtTargetManager != null
+            ? courtTargetManager.GetSquareFromPosition(transform.position)
+            : sourceSquare;
+
+        CourtTargetManager.TargetSelection selection = default;
+        bool targetFound = courtTargetManager != null && courtTargetManager.TryGetTarget(
+            currentSquare, transform.position, strikeDirection, strikeSpeed, out selection);
+
+        if (targetFound)
         {
+            // Reasonably good hit: send deterministically to selected sub-square
+            LaunchAt(selection.position, transform.position);
             lastHitTimes[hand] = Time.time;
+            Debug.Log($"[BallTrajectoryController] Guided hit to square {selection.targetSquare}, sub-square ({selection.column}, {selection.row}).", this);
         }
+        else
+        {
+            // Wildly mistimed or off: physics takes over, ball flies off, marked out of bounds
+            LaunchOutOfBounds(hand.Velocity);
+            lastHitTimes[hand] = Time.time;
+            string reason = !string.IsNullOrEmpty(selection.failureReason) ? selection.failureReason : "Strike was off target.";
+            Debug.LogWarning($"[BallTrajectoryController] Strike marked Out of Bounds: {reason}. Ball flying off with physics.", this);
+        }
+    }
+
+    /// <summary>
+    /// Applies an unguided physical velocity to the ball so physics takes over when a hit is wildly mistimed or off.
+    /// </summary>
+    public void LaunchOutOfBounds(Vector3 strikeVelocity)
+    {
+        if (ballRigidbody == null) return;
+
+        ballRigidbody.isKinematic = false;
+        ballRigidbody.constraints = RigidbodyConstraints.None;
+        ballRigidbody.WakeUp();
+
+        Vector3 impulse = strikeVelocity;
+        if (impulse.magnitude < 2f)
+        {
+            impulse = impulse.sqrMagnitude > 0.01f ? impulse.normalized * 3f : Vector3.forward * 3f;
+        }
+        // Ensure slight upward arc so it visibly flies away
+        if (impulse.y < 0.6f)
+        {
+            impulse.y = 1.2f;
+        }
+
+        ballRigidbody.linearVelocity = impulse * 1.1f;
     }
 
     private void ConfigureHandHitZone()
@@ -199,6 +292,7 @@ public class BallTrajectoryController : MonoBehaviour
         float time = Mathf.Clamp(horizontalDistance * flightTimePerWorldUnit,
             minimumFlightTime, maximumFlightTime);
         float gravityMagnitude = Mathf.Abs(Physics.gravity.y);
+
         if (gravityMagnitude < 0.0001f || horizontalDistance < 0.0001f)
         {
             Debug.LogError("Cannot calculate a ballistic arc with zero gravity or horizontal distance.", this);
@@ -208,13 +302,14 @@ public class BallTrajectoryController : MonoBehaviour
         Vector3 velocityXZ = horizontalDelta / time;
         float velocityY = (target.y - origin.y + 0.5f * gravityMagnitude * time * time) / time;
         Vector3 launchVelocity = velocityXZ + Vector3.up * velocityY;
+
         ballRigidbody.isKinematic = false;
+        ballRigidbody.constraints = RigidbodyConstraints.None;
         ballRigidbody.WakeUp();
-        ballRigidbody.linearVelocity = Vector3.zero;
-        ballRigidbody.angularVelocity = Vector3.zero;
         ballRigidbody.linearVelocity = launchVelocity;
-        Debug.Log($"Test ball launch: origin {origin}, target {target}, velocity {launchVelocity}.",
-            this);
+        ballRigidbody.angularVelocity = Vector3.zero;
+
+        Debug.Log($"[BallTrajectoryController] Ball launch: origin {origin}, target {target}, velocity {launchVelocity}.", this);
     }
 
     private void OnValidate()

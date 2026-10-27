@@ -1519,8 +1519,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
-  visualCubeSize: 0.12
-  visualMaterial: {fileID: 0}
+  visualCubeSize: 0.04
+  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   playerRole: 0
 --- !u!1 &337954785
 GameObject:
@@ -1949,7 +1949,7 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
@@ -1971,7 +1971,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &400000061
 Transform:
   m_ObjectHideFlags: 0
@@ -3674,7 +3674,7 @@ Transform:
   m_GameObject: {fileID: 995540202}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.53, z: 0}
+  m_LocalPosition: {x: 0, y: 2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8082,15 +8082,15 @@ MonoBehaviour:
   courtTargetManager: {fileID: 2144713620}
   ballRigidbody: {fileID: 1443982753}
   handHitZone: {fileID: 1443982758}
-  sourceSquare: 0
-  horizontalStrikeDirection: {x: 0, y: 0, z: 1}
+  sourceSquare: 3
+  horizontalStrikeDirection: {x: 0, y: 0, z: -1}
   swingSpeed: 6
   flightTimePerWorldUnit: 0.12
   minimumFlightTime: 0.35
   maximumFlightTime: 2
   directionTurnSpeed: 90
   keyboardHandStrikeKey: 102
-  handHitRadius: 0.9
+  handHitRadius: 0.25
   minimumHandSpeed: 0.5
   hitCooldown: 0.2
 --- !u!54 &1443982753
@@ -8118,7 +8118,7 @@ Rigidbody:
   m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 1
-  m_Constraints: 0
+  m_Constraints: 10
   m_CollisionDetection: 1
 --- !u!23 &1443982754
 MeshRenderer:
@@ -8207,7 +8207,7 @@ Transform:
   m_GameObject: {fileID: 1443982751}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3.3, y: 4.236759, z: -3.3}
+  m_LocalPosition: {x: 0, y: 2, z: 0}
   m_LocalScale: {x: 0.7, y: 0.7, z: 0.7}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -8705,7 +8705,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 3.31
+      value: -0.6
       objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalPosition.y
@@ -8713,11 +8713,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -3.28
+      value: 0.6
       objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.38268343
       objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalRotation.x
@@ -8725,7 +8725,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: 0.9238795
       objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalRotation.z
@@ -9480,8 +9480,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
-  visualCubeSize: 0.12
-  visualMaterial: {fileID: 0}
+  visualCubeSize: 0.04
+  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   playerRole: 0
 --- !u!1 &1820952559 stripped
 GameObject:
@@ -9506,8 +9506,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
-  visualCubeSize: 0.12
-  visualMaterial: {fileID: 0}
+  visualCubeSize: 0.04
+  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   playerRole: 0
 --- !u!1 &2106601459
 GameObject:
@@ -9554,8 +9554,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
-  visualCubeSize: 0.12
-  visualMaterial: {fileID: 0}
+  visualCubeSize: 0.04
+  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   playerRole: 0
 --- !u!1 &2144713619
 GameObject:
@@ -9588,7 +9588,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CourtTargetManager
   targetHeightAboveCourt: 0.02
   targetInset: 0.05
-  maximumAimError: 20
+  maximumAimError: 40
   minimumSwingSpeed: 1
   maximumSwingSpeed: 12
 --- !u!4 &2144713621

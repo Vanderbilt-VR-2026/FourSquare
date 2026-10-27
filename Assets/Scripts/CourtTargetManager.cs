@@ -3,8 +3,8 @@ using UnityEngine;
 
 /// <summary>
 /// Calculates a virtual 3x3 target grid for each quadrant of the court.
-/// Square indices are laid out in world X/Z order: 0=minX/minZ, 1=maxX/minZ,
-/// 2=maxX/maxZ, and 3=minX/maxZ.
+/// Square indices are laid out in world X/Z order: 0=minX/minZ (Square 1), 1=maxX/minZ (Square 2),
+/// 2=maxX/maxZ (Square 3), and 3=minX/maxZ (Square 4).
 /// </summary>
 public class CourtTargetManager : MonoBehaviour
 {
@@ -16,8 +16,8 @@ public class CourtTargetManager : MonoBehaviour
     [SerializeField, Min(0f)] private float targetInset = 0.05f;
 
     [Header("Strike Validation")]
-    [SerializeField, Range(0f, 90f)] private float maximumAimError = 20f;
-    [SerializeField, Min(0f)] private float minimumSwingSpeed = 1f;
+    [SerializeField, Range(10f, 90f)] private float maximumAimError = 40f;
+    [SerializeField, Min(0f)] private float minimumSwingSpeed = 0.8f;
     [SerializeField, Min(0f)] private float maximumSwingSpeed = 12f;
 
     private readonly Vector3[] targetPositions = new Vector3[SquareCount * TargetsPerSquare];
@@ -26,6 +26,7 @@ public class CourtTargetManager : MonoBehaviour
 
     public float MinimumSwingSpeed => minimumSwingSpeed;
     public float MaximumSwingSpeed => maximumSwingSpeed;
+    public float MaximumAimError => maximumAimError;
 
     [Serializable]
     public struct TargetSelection
@@ -44,11 +45,27 @@ public class CourtTargetManager : MonoBehaviour
         RecalculateTargets();
     }
 
+    /// <summary>
+    /// Identifies which court square (0..3) contains the specified world position.
+    /// </summary>
+    public int GetSquareFromPosition(Vector3 position)
+    {
+        RecalculateTargetsIfNeeded();
+        float midX = courtBounds.center.x;
+        float midZ = courtBounds.center.z;
+        bool isLeft = position.x < midX;
+        bool isBottom = position.z < midZ;
+
+        if (isLeft && isBottom) return 0;   // Square 1
+        if (!isLeft && isBottom) return 1;  // Square 2
+        if (!isLeft && !isBottom) return 2; // Square 3
+        return 3;                           // Square 4
+    }
+
     public bool TryGetTarget(int sourceSquare, Vector3 strikeOrigin, Vector3 horizontalStrikeDirection,
         float swingSpeed, out TargetSelection selection)
     {
         selection = default;
-        selection.sourceSquare = sourceSquare;
 
         if (!TryGetCourtBounds(out courtBounds))
         {
@@ -57,12 +74,12 @@ public class CourtTargetManager : MonoBehaviour
             return false;
         }
 
+        // Auto-detect source square from origin if out of bounds or negative
         if (sourceSquare < 0 || sourceSquare >= SquareCount)
         {
-            selection.isOutOfBounds = true;
-            selection.failureReason = "The source square index must be between 0 and 3.";
-            return false;
+            sourceSquare = GetSquareFromPosition(strikeOrigin);
         }
+        selection.sourceSquare = sourceSquare;
 
         Vector3 horizontalDirection = Vector3.ProjectOnPlane(horizontalStrikeDirection, Vector3.up);
         if (horizontalDirection.sqrMagnitude < 0.0001f)
@@ -71,31 +88,74 @@ public class CourtTargetManager : MonoBehaviour
             selection.failureReason = "The strike direction has no horizontal component.";
             return false;
         }
+        horizontalDirection.Normalize();
 
-        if (swingSpeed < minimumSwingSpeed || swingSpeed > maximumSwingSpeed)
+        if (swingSpeed < minimumSwingSpeed)
         {
             selection.isOutOfBounds = true;
-            selection.failureReason = $"Swing speed must be between {minimumSwingSpeed:0.##} and {maximumSwingSpeed:0.##}.";
+            selection.failureReason = $"Swing speed ({swingSpeed:0.##}) is below minimum ({minimumSwingSpeed:0.##}).";
             return false;
         }
 
-        Vector3 sourceCenter = GetSquareCenter(sourceSquare);
-        int targetSquare = FindTargetSquare(sourceSquare, sourceCenter, horizontalDirection.normalized);
-        Vector3 targetCenter = GetSquareCenter(targetSquare);
-        float aimError = Vector3.Angle(horizontalDirection, targetCenter - sourceCenter);
-        if (aimError > maximumAimError)
+        // Find the best target square among the other 3 squares
+        int bestTargetSquare = -1;
+        float smallestAngle = float.MaxValue;
+
+        for (int square = 0; square < SquareCount; square++)
+        {
+            if (square == sourceSquare) continue;
+
+            Vector3 toSquare = Vector3.ProjectOnPlane(GetSquareCenter(square) - strikeOrigin, Vector3.up);
+            if (toSquare.sqrMagnitude < 0.001f) continue;
+
+            float angle = Vector3.Angle(horizontalDirection, toSquare);
+            if (angle < smallestAngle)
+            {
+                smallestAngle = angle;
+                bestTargetSquare = square;
+            }
+        }
+
+        if (bestTargetSquare < 0 || smallestAngle > maximumAimError)
         {
             selection.isOutOfBounds = true;
-            selection.failureReason = $"Aim error is {aimError:0.#} degrees, above the {maximumAimError:0.#}-degree limit.";
+            selection.failureReason = $"Aim error ({smallestAngle:0.#}°) exceeds maximum ({maximumAimError:0.#}°).";
             return false;
         }
 
-        int column = GetColumn(horizontalDirection);
-        int row = GetDepthRow(swingSpeed);
-        selection.targetSquare = targetSquare;
-        selection.column = column;
-        selection.row = row;
-        selection.position = GetTargetPosition(targetSquare, column, row);
+        // Calculate intended landing point based on swing speed and direction
+        float normalizedSpeed = Mathf.InverseLerp(minimumSwingSpeed, maximumSwingSpeed, swingSpeed);
+        Vector3 targetCenter = GetSquareCenter(bestTargetSquare);
+        float distToTargetCenter = Vector3.Distance(strikeOrigin, targetCenter);
+        // Vary depth by +/- 0.9m around square center based on swing speed
+        float targetDistance = Mathf.Lerp(distToTargetCenter - 0.9f, distToTargetCenter + 0.9f, normalizedSpeed);
+        Vector3 intendedPoint = strikeOrigin + horizontalDirection * targetDistance;
+
+        // Select the sub-square in bestTargetSquare whose center is closest to intendedPoint
+        int bestCol = 1;
+        int bestRow = 1;
+        float closestDistSq = float.MaxValue;
+
+        for (int row = 0; row < 3; row++)
+        {
+            for (int col = 0; col < 3; col++)
+            {
+                Vector3 subSquarePos = GetTargetPosition(bestTargetSquare, col, row);
+                float distSq = Vector3.ProjectOnPlane(subSquarePos - intendedPoint, Vector3.up).sqrMagnitude;
+                if (distSq < closestDistSq)
+                {
+                    closestDistSq = distSq;
+                    bestCol = col;
+                    bestRow = row;
+                }
+            }
+        }
+
+        selection.targetSquare = bestTargetSquare;
+        selection.column = bestCol;
+        selection.row = bestRow;
+        selection.position = GetTargetPosition(bestTargetSquare, bestCol, bestRow);
+        selection.isOutOfBounds = false;
         return true;
     }
 
@@ -124,7 +184,8 @@ public class CourtTargetManager : MonoBehaviour
         float minZ = courtBounds.center.z - halfDepth;
         float maxX = courtBounds.center.x + halfWidth;
         float maxZ = courtBounds.center.z + halfDepth;
-        float topY = courtBounds.max.y + targetHeightAboveCourt;
+        // Floor level is at center.y (Y = 0 on court surface)
+        float topY = courtBounds.center.y + targetHeightAboveCourt;
 
         for (int square = 0; square < SquareCount; square++)
         {
@@ -137,16 +198,10 @@ public class CourtTargetManager : MonoBehaviour
 
             for (int row = 0; row < 3; row++)
             {
-                float rowProgress = (row + 0.5f) / 3f;
-                if (zHalf == 0)
-                {
-                    rowProgress = 1f - rowProgress;
-                }
-
-                float z = Mathf.Lerp(squareMinZ, squareMaxZ, rowProgress);
+                float z = Mathf.Lerp(squareMinZ + targetInset, squareMaxZ - targetInset, (row + 0.5f) / 3f);
                 for (int column = 0; column < 3; column++)
                 {
-                    float x = Mathf.Lerp(squareMinX, squareMaxX, (column + 0.5f) / 3f);
+                    float x = Mathf.Lerp(squareMinX + targetInset, squareMaxX - targetInset, (column + 0.5f) / 3f);
                     targetPositions[square * TargetsPerSquare + row * 3 + column] =
                         new Vector3(x, topY, z);
                 }
@@ -203,45 +258,14 @@ public class CourtTargetManager : MonoBehaviour
         return false;
     }
 
-    private Vector3 GetSquareCenter(int square)
+    public Vector3 GetSquareCenter(int square)
     {
+        RecalculateTargetsIfNeeded();
         float x = square == 0 || square == 3 ? courtBounds.center.x - courtBounds.size.x * 0.25f
             : courtBounds.center.x + courtBounds.size.x * 0.25f;
         float z = square == 0 || square == 1 ? courtBounds.center.z - courtBounds.size.z * 0.25f
             : courtBounds.center.z + courtBounds.size.z * 0.25f;
-        return new Vector3(x, courtBounds.center.y, z);
-    }
-
-    private int FindTargetSquare(int sourceSquare, Vector3 sourceCenter, Vector3 direction)
-    {
-        int bestSquare = sourceSquare;
-        float bestDot = float.NegativeInfinity;
-        for (int square = 0; square < SquareCount; square++)
-        {
-            if (square == sourceSquare) continue;
-            Vector3 toSquare = Vector3.ProjectOnPlane(GetSquareCenter(square) - sourceCenter, Vector3.up).normalized;
-            float dot = Vector3.Dot(direction, toSquare);
-            if (dot > bestDot)
-            {
-                bestDot = dot;
-                bestSquare = square;
-            }
-        }
-
-        return bestSquare;
-    }
-
-    private int GetColumn(Vector3 direction)
-    {
-        if (direction.x < -0.25f) return 0;
-        if (direction.x > 0.25f) return 2;
-        return 1;
-    }
-
-    private int GetDepthRow(float swingSpeed)
-    {
-        float normalizedSpeed = Mathf.InverseLerp(minimumSwingSpeed, maximumSwingSpeed, swingSpeed);
-        return Mathf.Clamp(Mathf.FloorToInt(normalizedSpeed * 3f), 0, 2);
+        return new Vector3(x, courtBounds.center.y + targetHeightAboveCourt, z);
     }
 
     private void OnDrawGizmos()
@@ -258,7 +282,7 @@ public class CourtTargetManager : MonoBehaviour
             for (int target = 0; target < TargetsPerSquare; target++)
             {
                 Vector3 position = targetPositions[square * TargetsPerSquare + target];
-                Gizmos.DrawSphere(position, Mathf.Max(0.025f, targetInset * 0.5f));
+                Gizmos.DrawSphere(position, Mathf.Max(0.04f, targetInset * 0.5f));
             }
         }
     }
