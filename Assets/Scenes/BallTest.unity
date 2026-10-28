@@ -8082,17 +8082,19 @@ MonoBehaviour:
   courtTargetManager: {fileID: 2144713620}
   ballRigidbody: {fileID: 1443982753}
   handHitZone: {fileID: 1443982758}
+  initialDropPosition: {x: 0, y: 2, z: 0}
+  autoResetYThreshold: -4
+  arcApexHeight: 1.25
+  minimumFlightTime: 0.65
+  maximumFlightTime: 2.5
   sourceSquare: 3
   horizontalStrikeDirection: {x: 0, y: 0, z: -1}
-  swingSpeed: 6
-  flightTimePerWorldUnit: 0.12
-  minimumFlightTime: 0.35
-  maximumFlightTime: 2
+  swingSpeed: 2.5
   directionTurnSpeed: 90
   keyboardHandStrikeKey: 102
-  handHitRadius: 0.25
-  minimumHandSpeed: 0.5
-  hitCooldown: 0.2
+  handHitRadius: 0.32
+  minimumHandSpeed: 0.25
+  hitCooldown: 0.25
 --- !u!54 &1443982753
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -8208,8 +8210,8 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 2, z: 0}
-  m_LocalScale: {x: 0.7, y: 0.7, z: 0.7}
-  m_ConstrainProportionsScale: 0
+  m_LocalScale: {x: 0.45, y: 0.45, z: 0.45}
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -8232,7 +8234,7 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 0.9
+  m_Radius: 0.25
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1449493252
 GameObject:
@@ -8709,7 +8711,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.14
       objectReference: {fileID: 0}
     - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
       propertyPath: m_LocalPosition.z
@@ -9587,10 +9589,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CourtTargetManager
   targetHeightAboveCourt: 0.02
-  targetInset: 0.05
-  maximumAimError: 40
-  minimumSwingSpeed: 1
-  maximumSwingSpeed: 12
+  targetInset: 0.08
+  maximumAimError: 48
+  minimumSwingSpeed: 0.8
+  maximumSwingSpeed: 4.8
+  showVisualGridInGame: 1
+  showTargetIndicator: 1
 --- !u!4 &2144713621
 Transform:
   m_ObjectHideFlags: 0

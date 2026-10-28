@@ -5,8 +5,9 @@ using UnityEngine.InputSystem.Controls;
 
 /// <summary>
 /// Test-ball helper that launches a Rigidbody to a target sub-square selected by CourtTargetManager.
-/// If a hit is reasonably on target, physics propels it deterministically to the selected sub-square.
-/// If a hit is wildly mistimed or off, physics takes over and the ball flies off and is marked Out of Bounds.
+/// If a hit is reasonably on target, physics propels it in a high, natural parabolic arc to the selected sub-square.
+/// If a hit is wildly mistimed or off (too weak, overpowered smash, or bad aim), physics takes over,
+/// the ball flies off freely, and it is marked Out of Bounds.
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class BallTrajectoryController : MonoBehaviour
@@ -19,22 +20,25 @@ public class BallTrajectoryController : MonoBehaviour
     [SerializeField] private Vector3 initialDropPosition = new Vector3(0f, 2f, 0f);
     [SerializeField] private float autoResetYThreshold = -4f;
 
+    [Header("Trajectory Arc & Bounce")]
+    [Tooltip("Peak height of the arc above launch point.")]
+    [SerializeField, Min(0.3f)] private float arcApexHeight = 1.25f;
+    [SerializeField, Min(0.2f)] private float minimumFlightTime = 0.65f;
+    [SerializeField, Min(0.5f)] private float maximumFlightTime = 2.5f;
+
     [Header("Test Strike")]
     [SerializeField, Range(0, 3)] private int sourceSquare = 3;
     [SerializeField] private Vector3 horizontalStrikeDirection = Vector3.forward;
-    [SerializeField, Min(0f)] private float swingSpeed = 6f;
-    [SerializeField, Min(0.05f)] private float flightTimePerWorldUnit = 0.15f;
-    [SerializeField, Min(0.05f)] private float minimumFlightTime = 0.4f;
-    [SerializeField, Min(0.05f)] private float maximumFlightTime = 2f;
+    [SerializeField, Min(0f)] private float swingSpeed = 2.5f;
 
     [Header("Keyboard Test Input")]
     [SerializeField, Min(0f)] private float directionTurnSpeed = 90f;
     [SerializeField] private KeyCode keyboardHandStrikeKey = KeyCode.F;
 
     [Header("Hand Test Input")]
-    [SerializeField, Min(0.01f)] private float handHitRadius = 0.3f;
-    [SerializeField, Min(0f)] private float minimumHandSpeed = 0.5f;
-    [SerializeField, Min(0f)] private float hitCooldown = 0.2f;
+    [SerializeField, Min(0.01f)] private float handHitRadius = 0.32f;
+    [SerializeField, Min(0f)] private float minimumHandSpeed = 0.25f;
+    [SerializeField, Min(0f)] private float hitCooldown = 0.25f;
 
     private readonly Dictionary<BallHandMarker, float> lastHitTimes =
         new Dictionary<BallHandMarker, float>();
@@ -144,7 +148,7 @@ public class BallTrajectoryController : MonoBehaviour
         if (courtTargetManager.TryGetTarget(currentSquare, transform.position,
             horizontalStrikeDirection, swingSpeed, out selection))
         {
-            LaunchAt(selection.position, transform.position);
+            LaunchAt(selection.position, transform.position, swingSpeed);
             Debug.Log($"[BallTrajectoryController] Launched toward square {selection.targetSquare}, column {selection.column}, row {selection.row}.", this);
         }
         else
@@ -168,11 +172,11 @@ public class BallTrajectoryController : MonoBehaviour
         if (courtTargetManager.TryGetTarget(launchingSquare, strikeOrigin, strikeDirection,
             strikeSpeed, out selection))
         {
-            LaunchAt(selection.position, strikeOrigin);
+            LaunchAt(selection.position, strikeOrigin, strikeSpeed);
             return true;
         }
 
-        Vector3 wildVelocity = strikeDirection.normalized * strikeSpeed + Vector3.up * 1.5f;
+        Vector3 wildVelocity = strikeDirection.normalized * strikeSpeed + Vector3.up * 2f;
         LaunchOutOfBounds(wildVelocity);
         Debug.LogWarning($"[BallTrajectoryController] Strike marked Out of Bounds: {selection.failureReason}. Ball flying off with physics.", this);
         return false;
@@ -191,7 +195,7 @@ public class BallTrajectoryController : MonoBehaviour
     private void TryHitWithHand(Collider other)
     {
         BallHandMarker hand = other.GetComponentInParent<BallHandMarker>();
-        if (hand == null || hand.Velocity.magnitude < minimumHandSpeed)
+        if (hand == null)
         {
             return;
         }
@@ -202,8 +206,32 @@ public class BallTrajectoryController : MonoBehaviour
             return;
         }
 
-        Vector3 strikeDirection = Vector3.ProjectOnPlane(hand.Velocity, Vector3.up);
-        float strikeSpeed = hand.Velocity.magnitude;
+        Vector3 handVel = hand.Velocity;
+        Vector3 handVelHorizontal = Vector3.ProjectOnPlane(handVel, Vector3.up);
+        Vector3 handToBall = Vector3.ProjectOnPlane(transform.position - hand.transform.position, Vector3.up);
+
+        float handSpeed = handVel.magnitude;
+        // Ignore only idle resting hands / negligible micro-jitters
+        if (handSpeed < minimumHandSpeed && handVelHorizontal.magnitude < 0.15f)
+        {
+            return;
+        }
+
+        // Determine robust strike direction: blend hand movement with hand-to-ball vector
+        Vector3 strikeDirection;
+        if (handVelHorizontal.sqrMagnitude > 0.04f)
+        {
+            strikeDirection = handToBall.sqrMagnitude > 0.001f
+                ? (handVelHorizontal.normalized * 0.7f + handToBall.normalized * 0.3f).normalized
+                : handVelHorizontal.normalized;
+        }
+        else
+        {
+            strikeDirection = handToBall.sqrMagnitude > 0.001f ? handToBall.normalized : Vector3.forward;
+        }
+
+        // Use true measured hand speed (do not force a minimum clamp so soft hits can be underpowered)
+        float strikeSpeed = handSpeed;
 
         if (courtTargetManager == null)
         {
@@ -220,15 +248,15 @@ public class BallTrajectoryController : MonoBehaviour
 
         if (targetFound)
         {
-            // Reasonably good hit: send deterministically to selected sub-square
-            LaunchAt(selection.position, transform.position);
+            // In-bounds hit: launch in parabolic arc scaled to hit speed
+            LaunchAt(selection.position, transform.position, strikeSpeed);
             lastHitTimes[hand] = Time.time;
-            Debug.Log($"[BallTrajectoryController] Guided hit to square {selection.targetSquare}, sub-square ({selection.column}, {selection.row}).", this);
+            Debug.Log($"[BallTrajectoryController] Guided hit to square {selection.targetSquare}, sub-square ({selection.column}, {selection.row}) at {strikeSpeed:0.#} m/s.", this);
         }
         else
         {
-            // Wildly mistimed or off: physics takes over, ball flies off, marked out of bounds
-            LaunchOutOfBounds(hand.Velocity);
+            // Wildly mistimed, overpowered smash, too weak, or bad aim: physics takes over, ball flies off, marked out of bounds
+            LaunchOutOfBounds(handVel);
             lastHitTimes[hand] = Time.time;
             string reason = !string.IsNullOrEmpty(selection.failureReason) ? selection.failureReason : "Strike was off target.";
             Debug.LogWarning($"[BallTrajectoryController] Strike marked Out of Bounds: {reason}. Ball flying off with physics.", this);
@@ -236,7 +264,8 @@ public class BallTrajectoryController : MonoBehaviour
     }
 
     /// <summary>
-    /// Applies an unguided physical velocity to the ball so physics takes over when a hit is wildly mistimed or off.
+    /// Applies an unguided physical velocity to the ball so physics takes over when a hit is out of bounds.
+    /// Handles overpowered smashes, underpowered dribbles, and off-court angles.
     /// </summary>
     public void LaunchOutOfBounds(Vector3 strikeVelocity)
     {
@@ -247,17 +276,27 @@ public class BallTrajectoryController : MonoBehaviour
         ballRigidbody.WakeUp();
 
         Vector3 impulse = strikeVelocity;
-        if (impulse.magnitude < 2f)
-        {
-            impulse = impulse.sqrMagnitude > 0.01f ? impulse.normalized * 3f : Vector3.forward * 3f;
-        }
-        // Ensure slight upward arc so it visibly flies away
-        if (impulse.y < 0.6f)
-        {
-            impulse.y = 1.2f;
-        }
 
-        ballRigidbody.linearVelocity = impulse * 1.1f;
+        if (impulse.magnitude > 4.5f)
+        {
+            // Overpowered smash: flies deep and out past the boundaries
+            Vector3 smashDir = impulse.normalized;
+            if (smashDir.y < 0.2f) smashDir.y = 0.3f;
+            ballRigidbody.linearVelocity = smashDir.normalized * (impulse.magnitude * 1.3f);
+        }
+        else if (impulse.magnitude < 0.8f)
+        {
+            // Underpowered / weak tap: dribbles softly and drops short
+            Vector3 weakDir = impulse.sqrMagnitude > 0.01f ? impulse.normalized : Vector3.forward;
+            ballRigidbody.linearVelocity = weakDir * 0.9f + Vector3.up * 0.7f;
+        }
+        else
+        {
+            // Off-target / wild angle: flies freely in the direction of the hit
+            Vector3 wildDir = impulse.normalized;
+            if (wildDir.y < 0.3f) wildDir.y = 0.45f;
+            ballRigidbody.linearVelocity = wildDir.normalized * (impulse.magnitude * 1.15f);
+        }
     }
 
     private void ConfigureHandHitZone()
@@ -278,7 +317,11 @@ public class BallTrajectoryController : MonoBehaviour
         }
     }
 
-    private void LaunchAt(Vector3 target, Vector3? originOverride = null)
+    /// <summary>
+    /// Launches the ball toward the floor target using a parabolic arc scaled to the swing speed.
+    /// Soft hits have a low, gentle arc; hard hits drive faster and deeper.
+    /// </summary>
+    private void LaunchAt(Vector3 target, Vector3? originOverride = null, float strikeSpeed = 2.5f)
     {
         if (ballRigidbody == null)
         {
@@ -289,8 +332,6 @@ public class BallTrajectoryController : MonoBehaviour
         Vector3 origin = originOverride ?? transform.position;
         Vector3 horizontalDelta = Vector3.ProjectOnPlane(target - origin, Vector3.up);
         float horizontalDistance = horizontalDelta.magnitude;
-        float time = Mathf.Clamp(horizontalDistance * flightTimePerWorldUnit,
-            minimumFlightTime, maximumFlightTime);
         float gravityMagnitude = Mathf.Abs(Physics.gravity.y);
 
         if (gravityMagnitude < 0.0001f || horizontalDistance < 0.0001f)
@@ -299,9 +340,31 @@ public class BallTrajectoryController : MonoBehaviour
             return;
         }
 
-        Vector3 velocityXZ = horizontalDelta / time;
-        float velocityY = (target.y - origin.y + 0.5f * gravityMagnitude * time * time) / time;
-        Vector3 launchVelocity = velocityXZ + Vector3.up * velocityY;
+        float minSpeed = courtTargetManager != null ? courtTargetManager.MinimumSwingSpeed : 0.8f;
+        float maxSpeed = courtTargetManager != null ? courtTargetManager.MaximumSwingSpeed : 4.8f;
+        float normSpeed = Mathf.InverseLerp(minSpeed, maxSpeed, strikeSpeed);
+
+        // Apex height scales with speed: soft hits arc low (0.85m), hard hits arc with energy (1.45m)
+        float effectiveApex = Mathf.Lerp(0.85f, 1.45f, normSpeed);
+        float apexY = Mathf.Max(origin.y, target.y) + effectiveApex;
+
+        // Kinematic rise and fall phases
+        float riseDist = Mathf.Max(0.05f, apexY - origin.y);
+        float velocityY = Mathf.Sqrt(2f * gravityMagnitude * riseDist);
+        float timeRise = velocityY / gravityMagnitude;
+
+        float fallDist = Mathf.Max(0.05f, apexY - target.y);
+        float timeFall = Mathf.Sqrt(2f * fallDist / gravityMagnitude);
+
+        // Hard hits fly quicker (0.72x time) with punch; soft hits float gently (1.05x time)
+        float kinematicTime = timeRise + timeFall;
+        float speedFlightFactor = Mathf.Lerp(1.05f, 0.72f, normSpeed);
+        float totalFlightTime = Mathf.Clamp(kinematicTime * speedFlightFactor, minimumFlightTime, maximumFlightTime);
+
+        // Calculate horizontal and vertical velocity to hit target accurately in totalFlightTime
+        Vector3 velocityXZ = horizontalDelta / totalFlightTime;
+        float launchVy = (target.y - origin.y + 0.5f * gravityMagnitude * totalFlightTime * totalFlightTime) / totalFlightTime;
+        Vector3 launchVelocity = velocityXZ + Vector3.up * launchVy;
 
         ballRigidbody.isKinematic = false;
         ballRigidbody.constraints = RigidbodyConstraints.None;
@@ -309,7 +372,7 @@ public class BallTrajectoryController : MonoBehaviour
         ballRigidbody.linearVelocity = launchVelocity;
         ballRigidbody.angularVelocity = Vector3.zero;
 
-        Debug.Log($"[BallTrajectoryController] Ball launch: origin {origin}, target {target}, velocity {launchVelocity}.", this);
+        Debug.Log($"[BallTrajectoryController] Launch: origin {origin}, target {target}, speed {strikeSpeed:0.#} m/s, apex {apexY:0.##}m, time {totalFlightTime:0.##}s, vel {launchVelocity}.", this);
     }
 
     private void OnValidate()
@@ -317,6 +380,9 @@ public class BallTrajectoryController : MonoBehaviour
         handHitRadius = Mathf.Max(0.01f, handHitRadius);
         minimumHandSpeed = Mathf.Max(0f, minimumHandSpeed);
         hitCooldown = Mathf.Max(0f, hitCooldown);
+        arcApexHeight = Mathf.Max(0.3f, arcApexHeight);
+        minimumFlightTime = Mathf.Max(0.2f, minimumFlightTime);
+        maximumFlightTime = Mathf.Max(minimumFlightTime, maximumFlightTime);
         ConfigureHandHitZone();
     }
 }
