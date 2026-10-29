@@ -29,7 +29,7 @@ public class CourtTargetManager : MonoBehaviour
     [SerializeField, Min(0f)] private float maximumSwingSpeed = 4.8f;
 
     [Header("VR Visual Feedback")]
-    [SerializeField] private bool showVisualGridInGame = true;
+    [SerializeField] private bool showVisualGridInGame = false;
     [SerializeField] private bool showTargetIndicator = true;
 
     private readonly Vector3[] targetPositions = new Vector3[SquareCount * TargetsPerSquare];
