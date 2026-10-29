@@ -1,3 +1,4 @@
+
 # FourSquare VR — Sprint 3
 
 ## Project Overview
@@ -146,6 +147,19 @@ These sounds provide feedback for interactions such as:
 - Room confirmation and other menu selections
 
 Existing audio assets were reused where possible rather than creating an entirely new sound library.
+
+#### Ball Behavior
+
+https://github.com/user-attachments/assets/6f77c9ce-a9a4-4ab7-b086-15d482aa69c0
+- Uses Rigidbody physics for gravity, bouncing, and collisions.
+- VR hand speed/direction determines ball strikes.
+- Guided parabolic trajectories target areas of the four-square court.
+- Supports keyboard controls for desktop testing.
+- Automatically respawns if the ball settles, falls below the court, or remains out of bounds for 3 seconds.
+- Uses Photon Fusion to synchronize one authoritative ball across all players.
+- Non-authoritative players send hit requests through RPCs, with NetworkTransform synchronizing the resulting movement.
+
+Multiplayer networking in progress
 
 #### Ball Hit and Ball Bounce Sounds
 
