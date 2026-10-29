@@ -189,20 +189,29 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         if (!System.Enum.IsDefined(typeof(SquareRole), role) || role == SquareRole.Spectator) return;
 
+        bool hasStateAuthority = Object != null && Object.IsValid && Object.HasStateAuthority;
+        Debug.Log(
+            $"[RoleTrace] RequestRole playerId='{PlayerId}', current={PlayerRole}, requested={role}, " +
+            $"stateAuthority={hasStateAuthority}.",
+            this);
+
         if (Object == null || !Object.IsValid)
         {
             NetworkRole = (int)role;
+            Debug.Log($"[RoleTrace] Applied local role playerId='{PlayerId}', role={PlayerRole}.", this);
             return;
         }
 
-        if (Object.HasStateAuthority)
+        if (hasStateAuthority)
         {
             NetworkRole = (int)role;
             ApplyRoleToLocalRig(role);
+            Debug.Log($"[RoleTrace] Applied network role playerId='{PlayerId}', role={PlayerRole}.", this);
         }
         else
         {
             RPC_SetRole((int)role);
+            Debug.Log($"[RoleTrace] Sent role request playerId='{PlayerId}', requested={role}.", this);
         }
     }
 
@@ -231,8 +240,12 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         if (System.Enum.IsDefined(typeof(SquareRole), role) && role != (int)SquareRole.Spectator)
         {
+            SquareRole oldRole = PlayerRole;
             NetworkRole = role;
             ApplyRoleToLocalRig((SquareRole)role);
+            Debug.Log(
+                $"[RoleTrace] RPC applied playerId='{PlayerId}', oldRole={oldRole}, newRole={PlayerRole}.",
+                this);
         }
     }
 
@@ -334,6 +347,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             if (marker != null) marker.SetPlayerRole(role);
         }
 
+        ApplyRoleToLocalRig(role);
         GameStateManager.Instance?.UpdateNetworkPlayerRole(this);
     }
 
