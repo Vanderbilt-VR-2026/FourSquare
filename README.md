@@ -67,7 +67,6 @@ The skybox changes help establish different environmental moods throughout the d
 
 *Figure 1: Start Scene showing the dynamic skybox.*
 
-[Insert Start Scene skybox screenshot]
 
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/41fac0fc-2cec-4f91-b888-f3727079ddc7" />
 
@@ -76,8 +75,6 @@ The skybox changes help establish different environmental moods throughout the d
 
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/ea907a2e-a69d-4380-9188-2a61a244c103" />
 
-
-[Insert City skybox screenshot]
 
 ### 2. City Environment and Visual Improvements
 
@@ -99,12 +96,10 @@ The environment uses a stylized visual approach rather than attempting to recrea
 *Figure 3: City environment with additional meshes and custom materials.*
 
 
-
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/3fd9a1a8-cba9-4550-8e5d-0361a7880be8" />
 
 
 *Figure 4: Updated Start Screen showing custom fonts and interface styling.*
-
 
 
 
@@ -176,7 +171,8 @@ Photon Fusion RPC-based playback was added to support multiplayer audio events.
 
 *Figure 5: Unity Audio Mixer showing the Master, Music, and SFX groups.*
 
-[Insert Audio Mixer screenshot]
+<img width="775" height="426" alt="Screenshot 2026-10-29 at 2 11 25 PM" src="https://github.com/user-attachments/assets/795c4300-e4a1-4c6c-b65b-fdb7c7a7c534" />
+
 
 ### 4. Improved Ball Physics and Targeting
 
@@ -349,40 +345,6 @@ Multiplayer room functionality was previously tested using Meta Quest as Player 
 The City gameplay environment also contains Photon Fusion functionality for player assignments, ball interactions, and session management.
 
 Continued integration and testing are needed to ensure that the entire flow works consistently from room creation through gameplay and the End Screen.
-
----
-
-## Next Steps
-
-Future development will focus on completing the full multiplayer gameplay loop and improving the overall VR experience.
-
-### Gameplay and Physics
-
-- Integrate the improved ball-targeting system into City.
-- Remove temporary debugging markers after testing.
-- Refine ball-hit detection, targeting, and out-of-bounds behavior.
-- Validate gameplay rules and player elimination.
-
-### Multiplayer
-
-- Complete the Start Screen-to-City multiplayer transition.
-- Verify synchronized ball movement and player interactions.
-- Test four-player room capacity and gameplay.
-- Improve handling of disconnections and room lifecycle events.
-
-### Audio
-
-- Test ball-hit and bounce sounds during actual multiplayer gameplay.
-- Confirm audio playback across Quest and desktop clients.
-- Balance background music and gameplay sound effects.
-- Improve music transitions between scenes.
-
-### User Experience
-
-- Refine the appearance of VR hands and controllers.
-- Improve menu interaction feedback.
-- Test the game with users to identify confusing interactions.
-- Improve the End Screen and complete the gameplay flow.
 
 ---
 
