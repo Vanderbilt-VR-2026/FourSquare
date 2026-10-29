@@ -69,7 +69,13 @@ The skybox changes help establish different environmental moods throughout the d
 
 [Insert Start Scene skybox screenshot]
 
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/41fac0fc-2cec-4f91-b888-f3727079ddc7" />
+
+
 *Figure 2: City environment showing a different time-of-day skybox.*
+
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/ea907a2e-a69d-4380-9188-2a61a244c103" />
+
 
 [Insert City skybox screenshot]
 
@@ -92,11 +98,17 @@ The environment uses a stylized visual approach rather than attempting to recrea
 
 *Figure 3: City environment with additional meshes and custom materials.*
 
-[Insert City environment screenshot]
+
+
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/3fd9a1a8-cba9-4550-8e5d-0361a7880be8" />
+
 
 *Figure 4: Updated Start Screen showing custom fonts and interface styling.*
 
-[Insert Start Screen UI screenshot]
+
+
+
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/41fac0fc-2cec-4f91-b888-f3727079ddc7" />
 
 ### 3. Audio Management and Sound Effects
 
