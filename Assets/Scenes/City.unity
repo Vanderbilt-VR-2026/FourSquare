@@ -85445,6 +85445,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SkyBoxManager
       objectReference: {fileID: 0}
+    - target: {fileID: 5776588447741129300, guid: 08d7bc4c1d319cf42b6d1d29e0eaa9cc, type: 3}
+      propertyPath: sunLight
+      value: 
+      objectReference: {fileID: 1587508204}
     - target: {fileID: 8202425235324720781, guid: 08d7bc4c1d319cf42b6d1d29e0eaa9cc, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0.0028500557
