@@ -43,6 +43,7 @@ public class GameStateManager : MonoBehaviour
     public bool IsBallInPlay => isBallInPlay;
     public bool HasGameStarted => hasGameStarted;
     public Transform BallSpawnPoint => ballSpawnPoint;
+    public GameObject BallPrefab => ballPrefab;
 
     private void Awake()
     {
@@ -72,7 +73,7 @@ public class GameStateManager : MonoBehaviour
         InitializeDictionary();
     }
 
-    private BallController SpawnBall()
+    private NetworkBallController SpawnBall()
     {
         if (ballPrefab == null)
         {
@@ -83,16 +84,23 @@ public class GameStateManager : MonoBehaviour
         Vector3 position = ballSpawnPoint != null ? ballSpawnPoint.position : transform.position;
         Quaternion rotation = ballSpawnPoint != null ? ballSpawnPoint.rotation : Quaternion.identity;
         GameObject ballObject = Instantiate(ballPrefab, position, rotation);
-        BallController ball = ballObject.GetComponent<BallController>();
+        NetworkBallController ball = ballObject.GetComponent<NetworkBallController>();
         if (ball == null)
         {
-            Debug.LogError("The configured ball prefab has no BallController.", ballObject);
+            Debug.LogError("The configured ball prefab has no NetworkBallController.", ballObject);
         }
         return ball;
     }
 
-    public BallController SpawnNetworkBall(NetworkRunner runner)
+    public NetworkBallController SpawnNetworkBall(NetworkRunner runner)
     {
+        if (NetworkBallController.Instance != null)
+            return NetworkBallController.Instance;
+
+        NetworkBallController existingBall = UnityEngine.Object.FindAnyObjectByType<NetworkBallController>();
+        if (existingBall != null)
+            return existingBall;
+
         if (runner == null || !runner.IsRunning)
         {
             Debug.LogError("A running NetworkRunner is required to spawn the networked ball.", this);
@@ -118,10 +126,10 @@ public class GameStateManager : MonoBehaviour
         Vector3 position = ballSpawnPoint != null ? ballSpawnPoint.position : transform.position;
         Quaternion rotation = ballSpawnPoint != null ? ballSpawnPoint.rotation : Quaternion.identity;
         NetworkObject networkBall = runner.Spawn(networkBallPrefab, position, rotation);
-        BallController ball = networkBall != null ? networkBall.GetComponent<BallController>() : null;
+        NetworkBallController ball = networkBall != null ? networkBall.GetComponent<NetworkBallController>() : null;
         if (ball == null)
         {
-            Debug.LogError("Fusion spawned the ball prefab without a BallController.", networkBall);
+            Debug.LogError("Fusion spawned the ball prefab without a NetworkBallController.", networkBall);
         }
         return ball;
     }
@@ -324,7 +332,7 @@ public class GameStateManager : MonoBehaviour
         }
 
         Debug.Log("[FourSquare] Preparing the game ball for the Started transition.", this);
-        BallController ball = runner != null
+        NetworkBallController ball = runner != null
             ? SpawnNetworkBall(runner)
             : SpawnBall();
         if (ball == null)
