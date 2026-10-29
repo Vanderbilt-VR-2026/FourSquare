@@ -15,10 +15,31 @@ public class BallTrajectoryController : MonoBehaviour
     [SerializeField] private CourtTargetManager courtTargetManager;
     [SerializeField] private Rigidbody ballRigidbody;
     [SerializeField] private SphereCollider handHitZone;
+    [SerializeField] private SphereCollider physicalCollider;
 
     [Header("Ball Reset")]
     [SerializeField] private Vector3 initialDropPosition = new Vector3(0f, 2f, 0f);
     [SerializeField] private float autoResetYThreshold = -4f;
+
+    [Header("Automatic Respawn")]
+    [Tooltip("Delay in seconds after leaving the playable court area before the ball automatically respawns.")]
+    [SerializeField, Min(0.5f)] private float outOfBoundsRespawnDelay = 3.0f;
+
+    [Tooltip("Continuous duration in seconds the ball must remain stationary on the ground before respawning.")]
+    [SerializeField, Min(0.2f)] private float groundSettledDuration = 1.0f;
+
+    [Tooltip("Linear speed threshold (m/s) below which the ball is considered stopped.")]
+    [SerializeField, Min(0.01f)] private float restLinearSpeedThreshold = 0.15f;
+
+    [Tooltip("Angular speed threshold (rad/s) below which the ball is considered stopped.")]
+    [SerializeField, Min(0.01f)] private float restAngularSpeedThreshold = 0.6f;
+
+    [Tooltip("Vertical clearance above the bottom of the ball to check for ground contact.")]
+    [SerializeField, Min(0.01f)] private float groundCheckTolerance = 0.08f;
+
+    private float outOfBoundsTimer;
+    private float groundSettledTimer;
+    private bool hasGroundContact;
 
     [Header("Trajectory Arc & Bounce")]
     [Tooltip("Peak height of the arc above launch point.")]
@@ -55,7 +76,7 @@ public class BallTrajectoryController : MonoBehaviour
             courtTargetManager = FindFirstObjectByType<CourtTargetManager>();
         }
 
-        ConfigureHandHitZone();
+        ConfigureColliders();
     }
 
     private void Start()
@@ -71,6 +92,11 @@ public class BallTrajectoryController : MonoBehaviour
             ResetBall();
             return;
         }
+
+        // Automatic respawn checks:
+        // 1. Respawns after 3 seconds if outside the playable four-square court area
+        // 2. Respawns after settling stationary on the ground for 1 second
+        UpdateAutomaticRespawn();
 
         Keyboard keyboard = Keyboard.current;
         if (keyboard == null)
@@ -121,6 +147,10 @@ public class BallTrajectoryController : MonoBehaviour
     [ContextMenu("Reset Ball")]
     public void ResetBall()
     {
+        outOfBoundsTimer = 0f;
+        groundSettledTimer = 0f;
+        hasGroundContact = false;
+
         if (ballRigidbody != null)
         {
             ballRigidbody.linearVelocity = Vector3.zero;
@@ -299,14 +329,136 @@ public class BallTrajectoryController : MonoBehaviour
         }
     }
 
-    private void ConfigureHandHitZone()
+    private void OnCollisionEnter(Collision collision)
     {
-        if (handHitZone == null)
+        EvaluateGroundCollision(collision);
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        EvaluateGroundCollision(collision);
+    }
+
+    private void OnCollisionExit(Collision collision)
+    {
+        hasGroundContact = false;
+    }
+
+    private void EvaluateGroundCollision(Collision collision)
+    {
+        for (int i = 0; i < collision.contactCount; i++)
         {
-            SphereCollider[] colliders = GetComponents<SphereCollider>();
-            if (colliders.Length > 1)
+            ContactPoint contact = collision.GetContact(i);
+            if (contact.normal.y > 0.5f)
             {
-                handHitZone = colliders[1];
+                hasGroundContact = true;
+                return;
+            }
+        }
+    }
+
+    public bool IsOutsidePlayableCourt()
+    {
+        if (courtTargetManager == null)
+        {
+            courtTargetManager = FindFirstObjectByType<CourtTargetManager>();
+        }
+
+        if (courtTargetManager != null)
+        {
+            return !courtTargetManager.IsPositionInsideCourt(transform.position);
+        }
+
+        return false;
+    }
+
+    private float GetBallRadius()
+    {
+        if (physicalCollider != null)
+        {
+            float maxScale = Mathf.Max(transform.lossyScale.x, Mathf.Max(transform.lossyScale.y, transform.lossyScale.z));
+            return physicalCollider.radius * maxScale;
+        }
+
+        return 0.225f;
+    }
+
+    private bool CheckIsOnGround()
+    {
+        if (hasGroundContact)
+        {
+            return true;
+        }
+
+        float radius = GetBallRadius();
+        float rayDistance = radius + groundCheckTolerance;
+
+        if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, rayDistance, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (hit.collider != null && hit.collider.transform != transform && !hit.collider.transform.IsChildOf(transform))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void UpdateAutomaticRespawn()
+    {
+        if (ballRigidbody == null) return;
+
+        // Condition 2: Ball goes out of the playable court area (3-second respawn timer)
+        bool isOutsideCourt = IsOutsidePlayableCourt();
+        if (isOutsideCourt)
+        {
+            outOfBoundsTimer += Time.deltaTime;
+            if (outOfBoundsTimer >= outOfBoundsRespawnDelay)
+            {
+                Debug.Log($"[BallTrajectoryController] Ball outside playable court for {outOfBoundsTimer:0.#}s. Respawning.", this);
+                ResetBall();
+                return;
+            }
+        }
+        else
+        {
+            outOfBoundsTimer = 0f;
+        }
+
+        // Condition 1: Ball comes to rest on the ground
+        bool isOnGround = CheckIsOnGround();
+        bool isNearlyStopped = ballRigidbody.IsSleeping() ||
+            (ballRigidbody.linearVelocity.sqrMagnitude < (restLinearSpeedThreshold * restLinearSpeedThreshold)
+             && ballRigidbody.angularVelocity.sqrMagnitude < (restAngularSpeedThreshold * restAngularSpeedThreshold));
+
+        if (isOnGround && isNearlyStopped)
+        {
+            groundSettledTimer += Time.deltaTime;
+            if (groundSettledTimer >= groundSettledDuration)
+            {
+                Debug.Log($"[BallTrajectoryController] Ball settled on ground for {groundSettledTimer:0.#}s. Respawning.", this);
+                ResetBall();
+                return;
+            }
+        }
+        else
+        {
+            groundSettledTimer = 0f;
+        }
+    }
+
+    private void ConfigureColliders()
+    {
+        SphereCollider[] colliders = GetComponents<SphereCollider>();
+        foreach (SphereCollider col in colliders)
+        {
+            if (col.isTrigger)
+            {
+                if (handHitZone == null) handHitZone = col;
+            }
+            else
+            {
+                if (physicalCollider == null) physicalCollider = col;
             }
         }
 
@@ -383,6 +535,6 @@ public class BallTrajectoryController : MonoBehaviour
         arcApexHeight = Mathf.Max(0.3f, arcApexHeight);
         minimumFlightTime = Mathf.Max(0.2f, minimumFlightTime);
         maximumFlightTime = Mathf.Max(minimumFlightTime, maximumFlightTime);
-        ConfigureHandHitZone();
+        ConfigureColliders();
     }
 }

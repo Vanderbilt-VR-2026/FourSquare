@@ -9588,6 +9588,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5e7c3b6974a3144388bad8b6c0c7cf0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CourtTargetManager
+  courtBoundsCollider: {fileID: 369436286}
   targetHeightAboveCourt: 0.02
   targetInset: 0.08
   maximumAimError: 48

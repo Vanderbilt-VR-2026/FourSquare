@@ -12,6 +12,10 @@ public class CourtTargetManager : MonoBehaviour
     public const int SquareCount = 4;
     public const int TargetsPerSquare = 9;
 
+    [Header("Court Bounds")]
+    [Tooltip("Optional explicit BoxCollider reference covering the court area (e.g. Court Bound). If null, auto-detected from children.")]
+    [SerializeField] private BoxCollider courtBoundsCollider;
+
     [Header("Target Layout")]
     [SerializeField, Min(0f)] private float targetHeightAboveCourt = 0.02f;
     [SerializeField, Min(0f)] private float targetInset = 0.08f;
@@ -40,6 +44,38 @@ public class CourtTargetManager : MonoBehaviour
     public float MinimumSwingSpeed => minimumSwingSpeed;
     public float MaximumSwingSpeed => maximumSwingSpeed;
     public float MaximumAimError => maximumAimError;
+    public BoxCollider CourtBoundsCollider => courtBoundsCollider;
+
+    public Bounds CourtBounds
+    {
+        get
+        {
+            RecalculateTargetsIfNeeded();
+            return courtBounds;
+        }
+    }
+
+    /// <summary>
+    /// Checks whether the given world position is horizontally inside the playable four-square court boundaries.
+    /// Supports both axis-aligned bounds and rotated BoxColliders.
+    /// </summary>
+    public bool IsPositionInsideCourt(Vector3 worldPosition)
+    {
+        RecalculateTargetsIfNeeded();
+
+        if (courtBoundsCollider != null)
+        {
+            Vector3 localPos = courtBoundsCollider.transform.InverseTransformPoint(worldPosition);
+            Vector3 center = courtBoundsCollider.center;
+            Vector3 halfSize = courtBoundsCollider.size * 0.5f;
+
+            return localPos.x >= center.x - halfSize.x && localPos.x <= center.x + halfSize.x
+                && localPos.z >= center.z - halfSize.z && localPos.z <= center.z + halfSize.z;
+        }
+
+        return worldPosition.x >= courtBounds.min.x && worldPosition.x <= courtBounds.max.x
+            && worldPosition.z >= courtBounds.min.z && worldPosition.z <= courtBounds.max.z;
+    }
 
     [Serializable]
     public struct TargetSelection
@@ -278,6 +314,16 @@ public class CourtTargetManager : MonoBehaviour
 
     private bool TryGetCourtBounds(out Bounds bounds)
     {
+        if (courtBoundsCollider == null)
+        {
+            courtBoundsCollider = GetComponentInChildren<BoxCollider>();
+        }
+
+        if (courtBoundsCollider != null)
+        {
+            bounds = courtBoundsCollider.bounds;
+            return bounds.size.x > 0f && bounds.size.z > 0f;
+        }
         Renderer courtRenderer = GetComponent<Renderer>();
         if (courtRenderer != null)
         {
@@ -329,7 +375,7 @@ public class CourtTargetManager : MonoBehaviour
     {
         if (targetIndicatorObject != null)
         {
-            targetIndicatorObject.transform.position = new Vector3(targetPos.x, targetHeightAboveCourt + 0.015f, targetPos.z);
+            targetIndicatorObject.transform.position = new Vector3(targetPos.x, targetPos.y + 0.015f, targetPos.z);
             targetIndicatorObject.SetActive(true);
             indicatorHideTime = Time.time + 3.0f;
         }
@@ -440,10 +486,11 @@ public class CourtTargetManager : MonoBehaviour
 
     private void CreateFeedbackText()
     {
+        RecalculateTargetsIfNeeded();
         GameObject textObj = new GameObject("CourtTargetFeedbackText");
         textObj.transform.SetParent(transform, false);
         // Position at court center, 2.3m up, facing Square 4 (towards player)
-        textObj.transform.position = new Vector3(1.25f, 2.3f, -1.25f);
+        textObj.transform.position = new Vector3(courtBounds.center.x, courtBounds.center.y + 2.3f, courtBounds.center.z);
         textObj.transform.rotation = Quaternion.Euler(0f, -45f, 0f);
 
         feedbackTextMesh = textObj.AddComponent<TextMesh>();
