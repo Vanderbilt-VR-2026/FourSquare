@@ -4,6 +4,9 @@ using Unity.XR.CoreUtils;
 using UnityEngine.XR;
 using System.Collections.Generic;
 using Fusion;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class PlayerJoinCourt : MonoBehaviour
 {
@@ -18,6 +21,7 @@ public class PlayerJoinCourt : MonoBehaviour
     [SerializeField] private float popupDistance = 1.25f;
     [SerializeField, Min(1)] private int minimumPlayersToStart = 1;
     [SerializeField] private int maximumPlayers = 4;
+    [SerializeField, Min(0f)] private float leaderboardHeightOffset = 2f;
     [SerializeField, Min(0.1f)] private float ballDropHeight = 1.5f;
     [SerializeField, Min(0f)] private float ballForwardOffset = 0.75f;
     [SerializeField, Min(0.1f)] private float exitHoldDuration = 2f;
@@ -26,12 +30,14 @@ public class PlayerJoinCourt : MonoBehaviour
     private const float PopupHeight = 360f;
     private const float UiRayDistance = 5f;
     private const float ExitPopupSize = 128f;
+    private const float PlayerSpawnTolerance = 1f;
     private static readonly Dictionary<XROrigin, PlayerSession> joinedPlayers = new Dictionary<XROrigin, PlayerSession>();
     private static readonly List<PlayerJoinCourt> activeCourts = new List<PlayerJoinCourt>();
     private static int lastDisplayedPlayerCount = -1;
     private static bool lastDisplayedGameStarted;
     private static Sprite exitRingSprite;
     private JoinZoneAura joinZoneAura;
+    private CourtLeaderboardBillboard leaderboardBillboard;
 
     private class PlayerSession
     {
@@ -133,6 +139,8 @@ public class PlayerJoinCourt : MonoBehaviour
         joinZoneAura = GetComponent<JoinZoneAura>();
         if (joinZoneAura == null) joinZoneAura = gameObject.AddComponent<JoinZoneAura>();
         joinZoneAura.Configure(GetComponent<Renderer>(), maximumPlayers);
+        leaderboardBillboard = gameObject.AddComponent<CourtLeaderboardBillboard>();
+        leaderboardBillboard.Initialize(courtBounds, squareSpawnPoints, leaderboardHeightOffset);
     }
 
     private void OnEnable()
@@ -145,6 +153,65 @@ public class PlayerJoinCourt : MonoBehaviour
         activeCourts.Remove(this);
     }
 
+#if UNITY_EDITOR
+    private void OnDrawGizmos()
+    {
+        if (Application.isPlaying) return;
+
+        Transform boardAnchor = CourtLeaderboardBillboard.GetBoardAnchor(transform, courtBounds);
+        CourtLeaderboardBillboard.GetBoardPose(
+            boardAnchor, courtBounds, squareSpawnPoints, leaderboardHeightOffset,
+            out Vector3 position, out Quaternion rotation);
+        if (Application.isPlaying && leaderboardBillboard != null
+            && leaderboardBillboard.BoardTransform != null)
+        {
+            position = leaderboardBillboard.BoardTransform.position;
+            rotation = leaderboardBillboard.BoardTransform.rotation;
+        }
+
+        Vector3 right = rotation * Vector3.right * (CourtLeaderboardBillboard.WorldWidth * 0.5f);
+        Vector3 up = rotation * Vector3.up * (CourtLeaderboardBillboard.WorldHeight * 0.5f);
+        Vector3[] corners =
+        {
+            position - right - up,
+            position - right + up,
+            position + right + up,
+            position + right - up
+        };
+
+        Handles.DrawSolidRectangleWithOutline(
+            corners,
+            new Color(0.04f, 0.08f, 0.12f, 0.55f),
+            new Color(0.45f, 0.9f, 1f, 1f));
+
+        Vector2 screenMin = HandleUtility.WorldToGUIPoint(corners[0]);
+        Vector2 screenMax = screenMin;
+        foreach (Vector3 corner in corners)
+        {
+            Vector2 screenPoint = HandleUtility.WorldToGUIPoint(corner);
+            screenMin = Vector2.Min(screenMin, screenPoint);
+            screenMax = Vector2.Max(screenMax, screenPoint);
+        }
+
+        Rect boardRect = Rect.MinMaxRect(screenMin.x, screenMin.y, screenMax.x, screenMax.y);
+        float labelFontSize = Mathf.Clamp(
+            Mathf.Min(boardRect.height * 0.25f, boardRect.width / 22f),
+            8f,
+            24f);
+        GUIStyle style = new GUIStyle(EditorStyles.boldLabel)
+        {
+            alignment = TextAnchor.MiddleCenter,
+            fontSize = Mathf.Max(1, Mathf.FloorToInt(labelFontSize)),
+            clipping = TextClipping.Clip,
+            wordWrap = false
+        };
+        style.normal.textColor = Color.white;
+        Handles.BeginGUI();
+        GUI.Label(boardRect, "WAITING FOR PLAYERS", style);
+        Handles.EndGUI();
+    }
+#endif
+
     public static bool IsBallOutsideCourt(Vector3 worldPosition)
     {
         foreach (PlayerJoinCourt court in activeCourts)
@@ -155,8 +222,19 @@ public class PlayerJoinCourt : MonoBehaviour
             Vector3 localPosition = boundsTransform.InverseTransformPoint(worldPosition);
             Vector3 halfSize = court.courtBounds.size * 0.5f;
             Vector3 center = court.courtBounds.center;
-            return localPosition.x < center.x - halfSize.x || localPosition.x > center.x + halfSize.x
+            bool outside = localPosition.x < center.x - halfSize.x || localPosition.x > center.x + halfSize.x
                 || localPosition.z < center.z - halfSize.z || localPosition.z > center.z + halfSize.z;
+            if (outside)
+            {
+                Debug.LogWarning(
+                    $"[RoleTrace] Out-of-court bounds check: court='{court.name}', " +
+                    $"ballWorld={worldPosition}, ballLocal={localPosition}, " +
+                    $"boundsCenterLocal={center}, boundsSizeLocal={court.courtBounds.size}, " +
+                    $"boundsWorld={court.courtBounds.bounds}.",
+                    court);
+            }
+
+            return outside;
         }
 
         return false;
@@ -223,24 +301,45 @@ public class PlayerJoinCourt : MonoBehaviour
     public static void MoveJoinedPlayerToRole(XROrigin xrOrigin, SquareRole role)
     {
         if (xrOrigin == null || role == SquareRole.Spectator) return;
-        if (!joinedPlayers.TryGetValue(xrOrigin, out PlayerSession session) || session.court == null) return;
 
         int spawnIndex = GetSpawnIndex(role);
-        if (session.court.squareSpawnPoints == null
-            || spawnIndex < 0
-            || spawnIndex >= session.court.squareSpawnPoints.Length
-            || session.court.squareSpawnPoints[spawnIndex] == null)
+        PlayerSession session = joinedPlayers.TryGetValue(xrOrigin, out PlayerSession joinedSession)
+            ? joinedSession
+            : null;
+        PlayerJoinCourt court = session != null && session.court != null
+            ? session.court
+            : activeCourts.Find(activeCourt => activeCourt != null
+                && activeCourt.squareSpawnPoints != null
+                && spawnIndex >= 0
+                && spawnIndex < activeCourt.squareSpawnPoints.Length
+                && activeCourt.squareSpawnPoints[spawnIndex] != null);
+        if (court == null)
         {
-            Debug.LogError($"No court spawn point is configured for the {role} role.", session.court);
+            Debug.LogError($"No court spawn point is available for the {role} role.", xrOrigin);
             return;
         }
 
-        Transform spawnPoint = session.court.squareSpawnPoints[spawnIndex];
-        TeleportPlayer(xrOrigin, spawnPoint, session.court.courtBounds);
-        session.squareSpawnPoint = spawnPoint;
+        if (spawnIndex < 0 || spawnIndex >= court.squareSpawnPoints.Length
+            || court.squareSpawnPoints[spawnIndex] == null)
+        {
+            Debug.LogError($"No court spawn point is configured for the {role} role.", court);
+            return;
+        }
+
+        Transform spawnPoint = court.squareSpawnPoints[spawnIndex];
+        Vector3 positionOffset = xrOrigin.transform.position - spawnPoint.position;
+        if (positionOffset.sqrMagnitude > PlayerSpawnTolerance * PlayerSpawnTolerance)
+        {
+            TeleportPlayer(xrOrigin, spawnPoint, court.courtBounds);
+            Debug.Log(
+                $"[FourSquare] Teleported local player to {role} square '{spawnPoint.name}' at {spawnPoint.position}.",
+                xrOrigin);
+        }
+
+        if (session != null) session.squareSpawnPoint = spawnPoint;
     }
 
-    public static void OnGameStarted()
+    public static void TeleportJoinedPlayersToAssignedRoles()
     {
         PlayerSession[] sessions = new PlayerSession[joinedPlayers.Count];
         joinedPlayers.Values.CopyTo(sessions, 0);
@@ -249,11 +348,67 @@ public class PlayerJoinCourt : MonoBehaviour
         {
             if (session.origin == null) continue;
 
-            FourSquareFusionPlayer networkPlayer = session.origin.GetComponent<FourSquareFusionPlayer>();
-            SquareRole startingRole = networkPlayer != null
+            FourSquareFusionPlayer networkPlayer =
+                session.origin.GetComponent<FourSquareFusionPlayer>();
+            SquareRole role = networkPlayer != null
                 ? networkPlayer.PlayerRole
                 : SquareRole.King;
-            MoveJoinedPlayerToRole(session.origin, startingRole);
+            MoveJoinedPlayerToRole(session.origin, role);
+        }
+    }
+
+    public static bool ArePlayersAtAssignedSquares(
+        FourSquareFusionPlayer[] players, out int playersNotAtSquare)
+    {
+        playersNotAtSquare = 0;
+        int rankedPlayers = 0;
+        foreach (FourSquareFusionPlayer player in players)
+        {
+            if (player == null || player.PlayerRole == SquareRole.Spectator) continue;
+
+            rankedPlayers++;
+            bool atAssignedSquare = false;
+            foreach (PlayerJoinCourt court in activeCourts)
+            {
+                if (court == null) continue;
+
+                int spawnIndex = GetSpawnIndex(player.PlayerRole);
+                if (court.squareSpawnPoints == null
+                    || spawnIndex < 0
+                    || spawnIndex >= court.squareSpawnPoints.Length
+                    || court.squareSpawnPoints[spawnIndex] == null)
+                {
+                    continue;
+                }
+
+                Vector3 target = court.squareSpawnPoints[spawnIndex].position;
+                Vector3 playerPosition = player.NetworkRootPosition;
+                Vector2 horizontalOffset = new Vector2(
+                    playerPosition.x - target.x,
+                    playerPosition.z - target.z);
+                if (horizontalOffset.sqrMagnitude <= PlayerSpawnTolerance * PlayerSpawnTolerance
+                    && Mathf.Abs(playerPosition.y - target.y) <= PlayerSpawnTolerance)
+                {
+                    atAssignedSquare = true;
+                    break;
+                }
+            }
+
+            if (!atAssignedSquare) playersNotAtSquare++;
+        }
+
+        return rankedPlayers > 0 && playersNotAtSquare == 0;
+    }
+
+    public static void OnGameStarted()
+    {
+        TeleportJoinedPlayersToAssignedRoles();
+        PlayerSession[] sessions = new PlayerSession[joinedPlayers.Count];
+        joinedPlayers.Values.CopyTo(sessions, 0);
+
+        foreach (PlayerSession session in sessions)
+        {
+            if (session.origin == null) continue;
 
             if (session.popup != null) session.popup.SetActive(false);
             if (session.leftUiRay != null) session.leftUiRay.enabled = false;
@@ -635,7 +790,7 @@ public class PlayerJoinCourt : MonoBehaviour
         Vector3 towardCamera = playerCamera.transform.position - popupTransform.position;
         if (towardCamera.sqrMagnitude > 0.0001f)
         {
-            popupTransform.rotation = Quaternion.LookRotation(towardCamera.normalized, Vector3.up);
+            popupTransform.rotation = Quaternion.LookRotation(-towardCamera.normalized, Vector3.up);
         }
     }
 

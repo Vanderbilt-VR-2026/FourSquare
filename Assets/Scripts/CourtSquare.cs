@@ -33,6 +33,10 @@ public class CourtSquare : MonoBehaviour
         lastActiveSquare = this;
         bounceCount++;
 
+        Debug.Log(
+            $"[RoleTrace] Court bounce: square={squareRole}, count={bounceCount}, " +
+            $"ballSpeed={collision.relativeVelocity.magnitude:F2}, position={ball.transform.position}.",
+            this);
         stateManager?.RegisterBallBounce(squareRole);
 
         if (bounceCount >= 2)

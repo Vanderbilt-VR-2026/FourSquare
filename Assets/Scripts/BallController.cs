@@ -47,6 +47,7 @@ public class BallController : NetworkBehaviour
     private Vector3 visualImpactScale;
     private float squashTimer;
     private Renderer[] ballRenderers;
+    private bool ballPhysicsEnabled;
 
     [Networked] public Vector3 NetworkPosition { get; set; }
     [Networked] public Quaternion NetworkRotation { get; set; }
@@ -66,6 +67,7 @@ public class BallController : NetworkBehaviour
             ballAudioSource = GetComponent<AudioSource>();
 
         ConfigureBallPhysics();
+        SetBallPhysicsEnabled(false);
 
         if (physicalCollider == null || catchZone == null)
         {
@@ -135,7 +137,10 @@ public class BallController : NetworkBehaviour
         BallHandMarker hand = other.GetComponentInParent<BallHandMarker>();
 
         if (hand != null)
+        {
+            EnableBallPhysicsOnHandContact(hand);
             TryHit(hand);
+        }
     }
 
     private void OnTriggerStay(Collider other)
@@ -143,7 +148,42 @@ public class BallController : NetworkBehaviour
         BallHandMarker hand = other.GetComponentInParent<BallHandMarker>();
 
         if (hand != null)
+        {
+            EnableBallPhysicsOnHandContact(hand);
             TryHit(hand);
+        }
+    }
+
+    private void EnableBallPhysicsOnHandContact(BallHandMarker hand)
+    {
+        GameStateManager stateManager = GameStateManager.Instance;
+        bool gameStarted = IsNetworked
+            ? NetworkGameStarted
+            : stateManager != null && stateManager.HasGameStarted;
+        if (!gameStarted || ballPhysicsEnabled || (IsNetworked && !Object.HasStateAuthority))
+            return;
+
+        SetBallPhysicsEnabled(true);
+        Debug.Log(
+            $"[BallPhysics] Enabled by hand contact: playerRole={hand.PlayerRole}, " +
+            $"ballPosition={transform.position}.",
+            this);
+    }
+
+    private void SetBallPhysicsEnabled(bool enabled)
+    {
+        ballPhysicsEnabled = enabled;
+        if (ballRigidbody == null)
+            return;
+
+        if (!enabled)
+        {
+            ballRigidbody.linearVelocity = Vector3.zero;
+            ballRigidbody.angularVelocity = Vector3.zero;
+        }
+
+        ballRigidbody.isKinematic = !enabled;
+        ballRigidbody.useGravity = enabled;
     }
 
     private void TryHit(BallHandMarker hand)
@@ -338,14 +378,7 @@ public class BallController : NetworkBehaviour
 
         Physics.SyncTransforms();
 
-        if (ballRigidbody != null)
-        {
-            ballRigidbody.linearVelocity = Vector3.zero;
-            ballRigidbody.angularVelocity = Vector3.zero;
-            ballRigidbody.isKinematic = false;
-            ballRigidbody.useGravity = true;
-        }
-        else
+        if (ballRigidbody == null)
         {
             Debug.LogError(
                 "The game ball has no Rigidbody, so it cannot " +
@@ -354,6 +387,8 @@ public class BallController : NetworkBehaviour
             );
             return false;
         }
+
+        SetBallPhysicsEnabled(false);
 
         if (IsNetworked)
         {
@@ -387,6 +422,8 @@ public class BallController : NetworkBehaviour
 
         if (launchDirection.sqrMagnitude < 0.0001f)
             return;
+
+        SetBallPhysicsEnabled(true);
 
         launchSpeed = Mathf.Clamp(
             launchSpeed,
@@ -508,8 +545,15 @@ public class BallController : NetworkBehaviour
 
         if (stateManager != null &&
             stateManager.IsBallInPlay &&
+            ballPhysicsEnabled &&
             PlayerJoinCourt.IsBallOutsideCourt(transform.position))
         {
+            Debug.LogWarning(
+                $"[RoleTrace] Ball triggered out-of-court handling: position={transform.position}, " +
+                $"velocity={(ballRigidbody != null ? ballRigidbody.linearVelocity : Vector3.zero)}, " +
+                $"lastSquareHit={stateManager.LastSquareHit}, " +
+                $"lastTouchedRole={stateManager.LastTouchedByPlayerRole}.",
+                this);
             stateManager.HandleBallOutsideCourt();
         }
     }
@@ -530,20 +574,12 @@ public class BallController : NetworkBehaviour
         if (Object.HasStateAuthority)
             NetworkGameStarted = false;
 
-        if (ballRigidbody != null)
-        {
-            ballRigidbody.isKinematic = !NetworkGameStarted;
-            ballRigidbody.useGravity = NetworkGameStarted;
-        }
+        SetBallPhysicsEnabled(false);
 
         if (Object.HasStateAuthority)
         {
             NetworkPosition = transform.position;
             NetworkRotation = transform.rotation;
-        }
-        else if (ballRigidbody != null)
-        {
-            ballRigidbody.isKinematic = true;
         }
 
         SetBallVisible(NetworkGameStarted);
@@ -569,8 +605,15 @@ public class BallController : NetworkBehaviour
 
             if (stateManager != null &&
                 stateManager.IsBallInPlay &&
+                ballPhysicsEnabled &&
                 PlayerJoinCourt.IsBallOutsideCourt(transform.position))
             {
+                Debug.LogWarning(
+                    $"[RoleTrace] Network ball triggered out-of-court handling: position={transform.position}, " +
+                    $"velocity={(ballRigidbody != null ? ballRigidbody.linearVelocity : Vector3.zero)}, " +
+                    $"lastSquareHit={stateManager.LastSquareHit}, " +
+                    $"lastTouchedRole={stateManager.LastTouchedByPlayerRole}.",
+                    this);
                 stateManager.HandleBallOutsideCourt();
             }
         }

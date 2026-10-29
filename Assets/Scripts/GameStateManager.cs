@@ -6,6 +6,9 @@ using Fusion;
 
 public class GameStateManager : MonoBehaviour
 {
+    private const float PlayerTeleportTimeout = 5f;
+    private const float PlayerTeleportPollInterval = 0.1f;
+
     // --- Singleton Pattern ---
     public static GameStateManager Instance { get; private set; }
 
@@ -43,6 +46,7 @@ public class GameStateManager : MonoBehaviour
     public bool IsBallInPlay => isBallInPlay;
     public bool HasGameStarted => hasGameStarted;
     public Transform BallSpawnPoint => ballSpawnPoint;
+    public IReadOnlyList<FourSquarePlayer> Players => playerList;
 
     private void Awake()
     {
@@ -310,6 +314,37 @@ public class GameStateManager : MonoBehaviour
             yield return new WaitForSecondsRealtime(ballSpawnDelay);
         }
 
+        PlayerJoinCourt.TeleportJoinedPlayersToAssignedRoles();
+        if (runner != null)
+        {
+            float waitTime = 0f;
+            FourSquareFusionPlayer[] assignedPlayers =
+                UnityEngine.Object.FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+            while (!PlayerJoinCourt.ArePlayersAtAssignedSquares(assignedPlayers, out int playersNotAtSquare))
+            {
+                if (hasGameStarted || !runner.IsRunning || !runner.IsSharedModeMasterClient)
+                {
+                    isStartingGame = false;
+                    yield break;
+                }
+
+                if (waitTime >= PlayerTeleportTimeout)
+                {
+                    Debug.LogError(
+                        $"Game start cancelled because {playersNotAtSquare} assigned player(s) did not " +
+                        $"reach their court squares within {PlayerTeleportTimeout:F0} seconds. No ball was spawned.",
+                        this);
+                    isStartingGame = false;
+                    yield break;
+                }
+
+                yield return new WaitForSecondsRealtime(PlayerTeleportPollInterval);
+                waitTime += PlayerTeleportPollInterval;
+                assignedPlayers =
+                    UnityEngine.Object.FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+            }
+        }
+
         if (hasGameStarted || (runner != null && (!runner.IsRunning || !runner.IsSharedModeMasterClient)))
         {
             isStartingGame = false;
@@ -546,9 +581,18 @@ public class GameStateManager : MonoBehaviour
     /// </summary>
     public bool EliminatePlayer(SquareRole eliminatedRole)
     {
-        if (!activePlayers.ContainsKey(eliminatedRole)) return false;
+        if (!activePlayers.TryGetValue(eliminatedRole, out FourSquarePlayer faultPlayer))
+        {
+            Debug.LogWarning(
+                $"[RoleTrace] Elimination ignored: no player currently has role={eliminatedRole}.",
+                this);
+            return false;
+        }
 
-        FourSquarePlayer faultPlayer = activePlayers[eliminatedRole];
+        Debug.LogWarning(
+            $"[RoleTrace] Elimination received: playerId='{faultPlayer.playerId}', " +
+            $"role={eliminatedRole}, gameStarted={hasGameStarted}.",
+            this);
         faultPlayer.eliminationsCount++;
 
         OnPlayerEliminated?.Invoke(eliminatedRole);
@@ -586,6 +630,9 @@ public class GameStateManager : MonoBehaviour
         // 2. The eliminated player goes straight to Peasant
         SquareRole oldFaultRole = faultPlayer.currentRole;
         faultPlayer.currentRole = SquareRole.Peasant;
+        Debug.LogWarning(
+            $"[RoleTrace] Demoting playerId='{faultPlayer.playerId}' from {oldFaultRole} to Peasant.",
+            this);
         SetNetworkPlayerRole(faultPlayer, SquareRole.Peasant);
         OnPlayerRoleChanged?.Invoke(faultPlayer, oldFaultRole, SquareRole.Peasant);
 
