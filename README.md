@@ -68,13 +68,15 @@ The skybox changes help establish different environmental moods throughout the d
 
 *Figure 1: Start Scene showing the dynamic skybox.*
 
-
-<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/41fac0fc-2cec-4f91-b888-f3727079ddc7" />
+<img width="600" height="600" alt="image" src="https://github.com/user-attachments/assets/ca4632c4-133d-4578-a1c5-4e305bfc71a1" />
 
 
 *Figure 2: City environment showing a different time-of-day skybox.*
 
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/ea907a2e-a69d-4380-9188-2a61a244c103" />
+
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/5faf6d58-5d54-49f2-9492-70b07b1a53a4" />
+
 
 
 ### 2. City Environment and Visual Improvements
@@ -99,12 +101,11 @@ The environment uses a stylized visual approach rather than attempting to recrea
 
 <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/3fd9a1a8-cba9-4550-8e5d-0361a7880be8" />
 
+<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/a03778f9-0d10-4078-947e-24ef646ad4ca" />
 
 *Figure 4: Updated Start Screen showing custom fonts and interface styling.*
 
-
-
-<img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/41fac0fc-2cec-4f91-b888-f3727079ddc7" />
+<img width="600" height="600" alt="image" src="https://github.com/user-attachments/assets/07c25fe7-4d78-460e-97b8-82f9caafd949" />
 
 ### 3. Audio Management and Sound Effects
 
