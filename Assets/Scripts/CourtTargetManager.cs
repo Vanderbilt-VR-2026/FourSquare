@@ -26,7 +26,7 @@ public class CourtTargetManager : MonoBehaviour
     [Tooltip("Hits below this speed are too weak to clear and are marked Out of Bounds.")]
     [SerializeField, Min(0f)] private float minimumSwingSpeed = 0.8f;
     [Tooltip("Hits above this speed are overpowered smashes that fly past the court Out of Bounds.")]
-    [SerializeField, Min(0f)] private float maximumSwingSpeed = 4.8f;
+    [SerializeField, Min(0f)] private float maximumSwingSpeed = 7.5f;
 
     [Header("VR Visual Feedback")]
     [SerializeField] private bool showVisualGridInGame = false;
