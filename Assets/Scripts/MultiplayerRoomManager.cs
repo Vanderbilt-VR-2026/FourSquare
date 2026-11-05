@@ -18,6 +18,7 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
     [Header("Scene Transition")]
     [SerializeField] private string cityScenePath = "Assets/Scenes/City.unity";
+    [SerializeField] private string endScenePath = "Assets/Scenes/EndScene.unity";
 #if UNITY_EDITOR
     [Header("Editor Testing")]
     [Tooltip("Run this Editor client as desktop without taking over an active headset.")]
@@ -26,6 +27,7 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
     private NetworkRunner runner;
     private bool isLoadingCity;
+    private bool isLoadingEndScene;
     private bool isStartingRoom;
 
     public static MultiplayerRoomManager Instance { get; private set; }
@@ -164,6 +166,7 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
             CurrentRoomCode = roomCode;
             isLoadingCity = false;
+            isLoadingEndScene = false;
             isStartingRoom = false;
             if (transform.parent != null)
                 transform.SetParent(null, true);
@@ -264,6 +267,7 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
             !runner.IsSharedModeMasterClient ||
             isStartingRoom ||
             isLoadingCity ||
+            isLoadingEndScene ||
             PlayerCount < RequiredPlayersCount)
         {
             return;
@@ -302,6 +306,7 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
         runner = null;
         CurrentRoomCode = null;
         isLoadingCity = false;
+        isLoadingEndScene = false;
 
         try
         {
@@ -340,7 +345,36 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
         TryStartCityTransition();
     }
 
-    public void OnPlayerLeft(NetworkRunner callbackRunner, PlayerRef player) { }
+    public void OnPlayerLeft(NetworkRunner callbackRunner, PlayerRef player)
+    {
+        if (callbackRunner != runner || isLoadingEndScene)
+            return;
+
+        int cityBuildIndex = SceneUtility.GetBuildIndexByScenePath(cityScenePath);
+        if (SceneManager.GetActiveScene().buildIndex != cityBuildIndex)
+            return;
+
+        isLoadingEndScene = true;
+        if (!callbackRunner.IsSharedModeMasterClient)
+            return;
+
+        int endBuildIndex = SceneUtility.GetBuildIndexByScenePath(endScenePath);
+        if (endBuildIndex < 0)
+        {
+            Debug.LogError(
+                $"End scene '{endScenePath}' is not enabled in Build Settings.",
+                this);
+            return;
+        }
+
+        Debug.LogWarning(
+            $"Fusion player {player} left the City scene; loading the End scene for the session.",
+            this);
+        callbackRunner.LoadScene(
+            SceneRef.FromIndex(endBuildIndex),
+            new LoadSceneParameters(LoadSceneMode.Single),
+            setActiveOnLoad: true);
+    }
 
     public void OnShutdown(NetworkRunner callbackRunner, ShutdownReason shutdownReason)
     {
