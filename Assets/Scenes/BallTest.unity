@@ -8085,7 +8085,7 @@ MonoBehaviour:
   initialDropPosition: {x: 0, y: 2, z: 0}
   autoResetYThreshold: -4
   arcApexHeight: 1.25
-  minimumFlightTime: 0.65
+  minimumFlightTime: 0.85
   maximumFlightTime: 2.5
   sourceSquare: 3
   horizontalStrikeDirection: {x: 0, y: 0, z: -1}
@@ -9593,7 +9593,7 @@ MonoBehaviour:
   targetInset: 0.08
   maximumAimError: 48
   minimumSwingSpeed: 0.8
-  maximumSwingSpeed: 4.8
+  maximumSwingSpeed: 7.5
   showVisualGridInGame: 1
   showTargetIndicator: 1
 --- !u!4 &2144713621

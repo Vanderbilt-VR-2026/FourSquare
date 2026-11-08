@@ -34,7 +34,7 @@ public class NetworkBallController : NetworkBehaviour
 
     [Header("Ball Reset")]
     [SerializeField] private Transform ballSpawnPoint;
-    [SerializeField] private Vector3 fallbackDropPosition = new Vector3(-1.28f, 2.03f, 39.38f);
+    [SerializeField] private Vector3 fallbackDropPosition = new Vector3(-1.28f, 2.08f, 39.38f);
     [SerializeField] private float autoResetYThreshold = -4f;
 
     [Header("Automatic Respawn")]
@@ -166,6 +166,16 @@ public class NetworkBallController : NetworkBehaviour
         if (foundSpawn != null)
         {
             ballSpawnPoint = foundSpawn.transform;
+        }
+    }
+
+    private Vector3 preCollisionVelocity;
+
+    private void FixedUpdate()
+    {
+        if (ballRigidbody != null)
+        {
+            preCollisionVelocity = ballRigidbody.linearVelocity;
         }
     }
 
@@ -537,6 +547,7 @@ public class NetworkBallController : NetworkBehaviour
     {
         EvaluateGroundCollision(collision);
         TryPlayBounceSound(collision);
+        ApplyGroundBounceElasticity(collision);
     }
 
     private void OnCollisionStay(Collision collision)
@@ -559,6 +570,40 @@ public class NetworkBallController : NetworkBehaviour
                 hasGroundContact = true;
                 return;
             }
+        }
+    }
+
+    private void ApplyGroundBounceElasticity(Collision collision)
+    {
+        if (!HasGameplayAuthority && IsNetworked)
+            return;
+
+        if (ballRigidbody == null)
+            return;
+
+        bool isGroundContact = false;
+        for (int i = 0; i < collision.contactCount; i++)
+        {
+            ContactPoint contact = collision.GetContact(i);
+            if (contact.normal.y > 0.5f)
+            {
+                isGroundContact = true;
+                break;
+            }
+        }
+
+        if (!isGroundContact)
+            return;
+
+        // Treat ground bounce as perfectly elastic for the vertical velocity component.
+        // Preserves 100% of the incoming vertical energy/height so the ball returns to its pre-bounce apex height.
+        float incomingVy = Mathf.Max(Mathf.Abs(collision.relativeVelocity.y), Mathf.Abs(preCollisionVelocity.y));
+
+        if (incomingVy > 0.25f)
+        {
+            Vector3 currentVel = ballRigidbody.linearVelocity;
+            currentVel.y = incomingVy;
+            ballRigidbody.linearVelocity = currentVel;
         }
     }
 

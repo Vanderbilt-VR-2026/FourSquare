@@ -283,7 +283,7 @@ MonoBehaviour:
   bounceCooldown: 0.12
   minimumBounceSpeed: 0.5
   ballSpawnPoint: {fileID: 0}
-  fallbackDropPosition: {x: -1.28, y: 2.03, z: 39.38}
+  fallbackDropPosition: {x: -1.28, y: 2.08, z: 39.38}
   autoResetYThreshold: -4
   outOfBoundsRespawnDelay: 3
   groundSettledDuration: 1
