@@ -34,7 +34,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.5}
   m_AnchorMax: {x: 0, y: 0.5}
-  m_AnchoredPosition: {x: 675, y: 250}
+  m_AnchoredPosition: {x: 675, y: 300}
   m_SizeDelta: {x: 300, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &3276726712233401236
@@ -92,8 +92,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 30
-  m_fontSizeBase: 30
+  m_fontSize: 25
+  m_fontSizeBase: 25
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -152,6 +152,7 @@ GameObject:
   - component: {fileID: 350774810742917943}
   - component: {fileID: 9188102631058289230}
   - component: {fileID: 979321705808114926}
+  - component: {fileID: 683000000000000000}
   m_Layer: 0
   m_Name: VR Player
   m_TagString: Player
@@ -282,6 +283,20 @@ MonoBehaviour:
   _NetworkRightHandRotation: {x: 0, y: 0, z: 0, w: 0}
   _NetworkHasXRTracking: 0
   _NetworkRole: 0
+--- !u!114 &683000000000000000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992349184629936267}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 683a288200a04b7ea9385d8dc7242263, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  tagPrefab: {fileID: 1000000000000000000, guid: 9b7e0f0d7b4e4a9e9a1f2c3d4e5f6071, type: 3}
+  heightAboveHead: 0.35
 --- !u!114 &979321705808114926
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -880,8 +895,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 30
-  m_fontSizeBase: 30
+  m_fontSize: 25
+  m_fontSizeBase: 25
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1111,7 +1126,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -675, y: 250}
+  m_AnchoredPosition: {x: -675, y: 300}
   m_SizeDelta: {x: 300, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1761357102060695337
@@ -1169,8 +1184,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 30
-  m_fontSizeBase: 30
+  m_fontSize: 25
+  m_fontSizeBase: 25
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18

@@ -90,6 +90,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         rigCamera = head != null ? head.GetComponent<Camera>() : GetComponentInChildren<Camera>(true);
         handMarkers = GetComponentsInChildren<BallHandMarker>(true);
+        if (GetComponent<PlayerNameTag>() == null)
+            gameObject.AddComponent<PlayerNameTag>();
     }
 
     private void CreateSquareHead()
@@ -271,7 +273,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         foreach (UnityEngine.Behaviour behaviour in GetComponentsInChildren<UnityEngine.Behaviour>(true))
         {
-            if (behaviour == this || behaviour is XROrigin || behaviour is Camera || behaviour is AudioListener)
+            if (behaviour == this || behaviour is PlayerNameTag
+                || behaviour.GetComponentInParent<PlayerNameTag>() != null
+                || behaviour is XROrigin || behaviour is Camera || behaviour is AudioListener)
             {
                 continue;
             }
