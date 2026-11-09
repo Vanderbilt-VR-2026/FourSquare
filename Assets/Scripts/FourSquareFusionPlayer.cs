@@ -13,6 +13,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [SerializeField] private Transform head;
     [SerializeField] private Transform leftHand;
     [SerializeField] private Transform rightHand;
+    [SerializeField] private RoomCodeOverlayUI playerOverlay;
 
     [Header("Remote Rig")]
     [SerializeField] private Renderer[] avatarRenderers;
@@ -146,6 +147,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
 
         ConfigureRigForAuthority();
+        AttachPlayerOverlay();
         GameStateManager.Instance?.RegisterNetworkPlayer(this);
     }
 
@@ -260,6 +262,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         bool isLocal = HasLocalAuthority;
         if (rigCamera != null) rigCamera.enabled = isLocal;
+        if (playerOverlay != null) playerOverlay.SetVisible(isLocal);
 
         foreach (AudioListener listener in GetComponentsInChildren<AudioListener>(true))
         {
@@ -301,6 +304,14 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         {
             squareHeadRenderer.enabled = !isLocal;
         }
+    }
+
+    private void AttachPlayerOverlay()
+    {
+        if (!HasLocalAuthority || head == null) return;
+
+        if (playerOverlay != null)
+            playerOverlay.AttachToHead(head);
     }
 
     private void Update()

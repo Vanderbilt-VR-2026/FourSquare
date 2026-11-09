@@ -38,14 +38,25 @@ public class StartScreenUI : MonoBehaviour
     [Header("Join Room")]
     [SerializeField] private TMP_InputField roomCodeInputField;
 
+    [Header("Connection Feedback")]
+    [SerializeField] private TMP_Text connectionStatusText;
+
     [Header("Multiplayer")]
     [SerializeField] private MultiplayerRoomManager multiplayerRoomManager;
 
     private string currentRoomCode;
     private bool isConnecting = false;
+    private TMP_Text createRoomButtonText;
+    private TMP_Text joinRoomConfirmButtonText;
+    private string createRoomButtonLabel;
+    private string joinRoomConfirmButtonLabel;
+    private float loadingAnimationTimer;
+    private int loadingDotCount;
 
     private IEnumerator Start()
     {
+        CacheButtonLabels();
+        SetConnectionStatus(string.Empty);
         SetAllPanelsInactive();
 
         if (playerCamera == null || menuCanvas == null)
@@ -140,6 +151,77 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.onClick.RemoveListener(OnJoinRoomConfirmed);
+    }
+
+    private void Update()
+    {
+        if (!isConnecting)
+            return;
+
+        loadingAnimationTimer += Time.unscaledDeltaTime;
+        if (loadingAnimationTimer < 0.35f)
+            return;
+
+        loadingAnimationTimer = 0f;
+        loadingDotCount = (loadingDotCount + 1) % 4;
+        string dots = new string('.', loadingDotCount);
+
+        if (createRoomButton != null && !createRoomButton.interactable)
+            SetButtonLabel(createRoomButtonText, createRoomButtonLabel + dots);
+
+        if (joinRoomConfirmButton != null && !joinRoomConfirmButton.interactable)
+            SetButtonLabel(joinRoomConfirmButtonText, joinRoomConfirmButtonLabel + dots);
+    }
+
+    private void CacheButtonLabels()
+    {
+        if (createRoomButton != null)
+        {
+            createRoomButtonText = createRoomButton.GetComponentInChildren<TMP_Text>();
+            createRoomButtonLabel = createRoomButtonText != null
+                ? createRoomButtonText.text
+                : string.Empty;
+        }
+
+        if (joinRoomConfirmButton != null)
+        {
+            joinRoomConfirmButtonText =
+                joinRoomConfirmButton.GetComponentInChildren<TMP_Text>();
+            joinRoomConfirmButtonLabel = joinRoomConfirmButtonText != null
+                ? joinRoomConfirmButtonText.text
+                : string.Empty;
+        }
+    }
+
+    private void SetButtonLabel(TMP_Text buttonText, string label)
+    {
+        if (buttonText != null)
+            buttonText.text = label;
+    }
+
+    private void SetConnectionStatus(string message)
+    {
+        if (connectionStatusText != null)
+        {
+            connectionStatusText.text = message;
+            connectionStatusText.gameObject.SetActive(!string.IsNullOrEmpty(message));
+        }
+    }
+
+    private void BeginConnectionFeedback(string message)
+    {
+        isConnecting = true;
+        loadingAnimationTimer = 0f;
+        loadingDotCount = 0;
+        SetConnectionStatus(message);
+    }
+
+    private void EndConnectionFeedback()
+    {
+        isConnecting = false;
+        SetButtonLabel(createRoomButtonText, createRoomButtonLabel);
+        SetButtonLabel(joinRoomConfirmButtonText, joinRoomConfirmButtonLabel);
+        SetConnectionStatus(string.Empty);
     }
 
     private void SetAllPanelsInactive()
@@ -259,7 +341,7 @@ public class StartScreenUI : MonoBehaviour
             return;
         }
 
-        isConnecting = true;
+        BeginConnectionFeedback("Creating room...");
 
         if (createRoomButton != null)
             createRoomButton.interactable = false;
@@ -300,7 +382,7 @@ public class StartScreenUI : MonoBehaviour
         }
         finally
         {
-            isConnecting = false;
+            EndConnectionFeedback();
 
             if (createRoomButton != null)
                 createRoomButton.interactable = true;
@@ -352,6 +434,7 @@ public class StartScreenUI : MonoBehaviour
         // Validate the four-letter code.
         if (code.Length != 4)
         {
+            SetConnectionStatus("Enter a 4-letter room code.");
             Debug.LogWarning(
                 "Please enter exactly four letters."
             );
@@ -362,6 +445,7 @@ public class StartScreenUI : MonoBehaviour
         {
             if (letter < 'A' || letter > 'Z')
             {
+                SetConnectionStatus("Room code must contain only A-Z.");
                 Debug.LogWarning(
                     "Room code must contain only A-Z."
                 );
@@ -369,7 +453,7 @@ public class StartScreenUI : MonoBehaviour
             }
         }
 
-        isConnecting = true;
+        BeginConnectionFeedback("Joining room...");
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.interactable = false;
@@ -406,7 +490,7 @@ public class StartScreenUI : MonoBehaviour
         }
         finally
         {
-            isConnecting = false;
+            EndConnectionFeedback();
 
             if (joinRoomConfirmButton != null)
                 joinRoomConfirmButton.interactable = true;

@@ -50,6 +50,8 @@ public static class FourSquareFusionSetup
             serializedPlayer.FindProperty("head").objectReferenceValue = origin.Camera != null ? origin.Camera.transform : null;
             serializedPlayer.FindProperty("leftHand").objectReferenceValue = leftHand;
             serializedPlayer.FindProperty("rightHand").objectReferenceValue = rightHand;
+            RoomCodeOverlayUI playerOverlay = root.GetComponentInChildren<RoomCodeOverlayUI>(true);
+            serializedPlayer.FindProperty("playerOverlay").objectReferenceValue = playerOverlay;
             SerializedProperty renderers = serializedPlayer.FindProperty("avatarRenderers");
             renderers.arraySize = root.GetComponentsInChildren<Renderer>(true).Length;
             Renderer[] childRenderers = root.GetComponentsInChildren<Renderer>(true);
