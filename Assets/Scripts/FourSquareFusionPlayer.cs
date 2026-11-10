@@ -96,41 +96,14 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         if (stickmanTransform != null)
         {
-            if (ikLeftHandTarget == null) ikLeftHandTarget = FindChild(stickmanTransform, "LeftHandTarget");
-            if (ikRightHandTarget == null) ikRightHandTarget = FindChild(stickmanTransform, "RightHandTarget");
             if (mixamoAnimator == null) mixamoAnimator = stickmanTransform.GetComponent<Animator>();
+            SetupIKConstraints();
         }
 
         if (leftHand == null) Debug.LogError("FourSquareFusionPlayer could not find the XR Left Hand transform.", this);
         if (rightHand == null) Debug.LogError("FourSquareFusionPlayer could not find the XR Right Hand transform.", this);
         if (ikLeftHandTarget == null) Debug.LogError("FourSquareFusionPlayer could not find Stickman/IK_Rig/LeftHandTarget.", this);
         if (ikRightHandTarget == null) Debug.LogError("FourSquareFusionPlayer could not find Stickman/IK_Rig/RightHandTarget.", this);
-
-        if (stickmanTransform != null)
-        {
-            rigBuilder = stickmanTransform.GetComponent<RigBuilder>()
-                ?? stickmanTransform.GetComponentInChildren<RigBuilder>(true);
-            if (rigBuilder == null)
-            {
-                Debug.LogError("FourSquareFusionPlayer could not find a RigBuilder on Stickman.", this);
-            }
-            else
-            {
-                foreach (Rig rig in rigBuilder.GetComponentsInChildren<Rig>(true))
-                {
-                    rig.weight = 1f;
-                }
-
-                foreach (TwoBoneIKConstraint constraint in rigBuilder.GetComponentsInChildren<TwoBoneIKConstraint>(true))
-                {
-                    constraint.weight = 1f;
-                    constraint.data.targetPositionWeight = 1f;
-                    constraint.data.targetRotationWeight = 1f;
-                }
-
-                EnsureRigBuilt();
-            }
-        }
 
         CreateSquareHead();
         if (avatarRenderers == null || avatarRenderers.Length == 0 || System.Array.TrueForAll(avatarRenderers, renderer => renderer == null))
@@ -147,6 +120,127 @@ public class FourSquareFusionPlayer : NetworkBehaviour
                     && parameter.type == AnimatorControllerParameterType.Float);
     }
 
+    private void Start()
+    {
+        if (Object == null || !Object.IsValid)
+        {
+            ConfigureRigForAuthority();
+            EnsureRigBuilt();
+        }
+    }
+
+    private void SetupIKConstraints()
+    {
+        if (stickmanTransform == null) return;
+
+        rigBuilder = stickmanTransform.GetComponent<RigBuilder>()
+            ?? stickmanTransform.GetComponentInChildren<RigBuilder>(true);
+        if (rigBuilder == null)
+        {
+            rigBuilder = stickmanTransform.gameObject.AddComponent<RigBuilder>();
+        }
+
+        Transform ikRigTransform = FindChild(stickmanTransform, "IK_Rig");
+        if (ikRigTransform == null)
+        {
+            GameObject ikRigObj = new GameObject("IK_Rig");
+            ikRigTransform = ikRigObj.transform;
+            ikRigTransform.SetParent(stickmanTransform, false);
+        }
+
+        Rig ikRig = ikRigTransform.GetComponent<Rig>();
+        if (ikRig == null) ikRig = ikRigTransform.gameObject.AddComponent<Rig>();
+        ikRig.weight = 1f;
+
+        if (ikLeftHandTarget == null) ikLeftHandTarget = FindChild(stickmanTransform, "LeftHandTarget");
+        if (ikLeftHandTarget == null)
+        {
+            GameObject leftTargetObj = new GameObject("LeftHandTarget");
+            ikLeftHandTarget = leftTargetObj.transform;
+            ikLeftHandTarget.SetParent(ikRigTransform, false);
+        }
+        else if (ikLeftHandTarget.parent != ikRigTransform)
+        {
+            ikLeftHandTarget.SetParent(ikRigTransform, true);
+        }
+
+        if (ikRightHandTarget == null) ikRightHandTarget = FindChild(stickmanTransform, "RightHandTarget");
+        if (ikRightHandTarget == null)
+        {
+            GameObject rightTargetObj = new GameObject("RightHandTarget");
+            ikRightHandTarget = rightTargetObj.transform;
+            ikRightHandTarget.SetParent(ikRigTransform, false);
+        }
+        else if (ikRightHandTarget.parent != ikRigTransform)
+        {
+            ikRightHandTarget.SetParent(ikRigTransform, true);
+        }
+
+        // Locate bones on the skeleton
+        Transform leftArm = FindChild(stickmanTransform, "mixamorig:LeftArm")
+            ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.LeftUpperArm) : null);
+        Transform leftForeArm = FindChild(stickmanTransform, "mixamorig:LeftForeArm")
+            ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.LeftLowerArm) : null);
+        Transform leftHandBone = FindChild(stickmanTransform, "mixamorig:LeftHand")
+            ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.LeftHand) : null);
+
+        Transform rightArm = FindChild(stickmanTransform, "mixamorig:RightArm")
+            ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.RightUpperArm) : null);
+        Transform rightForeArm = FindChild(stickmanTransform, "mixamorig:RightForeArm")
+            ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.RightLowerArm) : null);
+        Transform rightHandBone = FindChild(stickmanTransform, "mixamorig:RightHand")
+            ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.RightHand) : null);
+
+        // Configure Left Hand IK
+        TwoBoneIKConstraint leftConstraint = ikLeftHandTarget.GetComponent<TwoBoneIKConstraint>();
+        if (leftConstraint == null) leftConstraint = ikLeftHandTarget.gameObject.AddComponent<TwoBoneIKConstraint>();
+        leftConstraint.weight = 1f;
+        if (leftArm != null) leftConstraint.data.root = leftArm;
+        if (leftForeArm != null) leftConstraint.data.mid = leftForeArm;
+        if (leftHandBone != null) leftConstraint.data.tip = leftHandBone;
+        leftConstraint.data.target = ikLeftHandTarget;
+        leftConstraint.data.targetPositionWeight = 1f;
+        leftConstraint.data.targetRotationWeight = 1f;
+
+        // Configure Right Hand IK
+        TwoBoneIKConstraint rightConstraint = ikRightHandTarget.GetComponent<TwoBoneIKConstraint>();
+        if (rightConstraint == null) rightConstraint = ikRightHandTarget.gameObject.AddComponent<TwoBoneIKConstraint>();
+        rightConstraint.weight = 1f;
+        if (rightArm != null) rightConstraint.data.root = rightArm;
+        if (rightForeArm != null) rightConstraint.data.mid = rightForeArm;
+        if (rightHandBone != null) rightConstraint.data.tip = rightHandBone;
+        rightConstraint.data.target = ikRightHandTarget;
+        rightConstraint.data.targetPositionWeight = 1f;
+        rightConstraint.data.targetRotationWeight = 1f;
+
+        // Clean up any extraneous constraints on other objects
+        foreach (TwoBoneIKConstraint constraint in stickmanTransform.GetComponentsInChildren<TwoBoneIKConstraint>(true))
+        {
+            if (constraint != leftConstraint && constraint != rightConstraint)
+            {
+                Destroy(constraint);
+            }
+        }
+
+        // Ensure RigBuilder layer is configured
+        bool hasRigLayer = false;
+        for (int i = 0; i < rigBuilder.layers.Count; i++)
+        {
+            if (rigBuilder.layers[i].rig == ikRig)
+            {
+                hasRigLayer = true;
+                break;
+            }
+        }
+        if (!hasRigLayer)
+        {
+            rigBuilder.layers.Clear();
+            rigBuilder.layers.Add(new RigLayer(ikRig, true));
+        }
+
+        EnsureRigBuilt();
+    }
+
     private void CreateSquareHead()
     {
         if (head == null)
@@ -161,6 +255,12 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         headObject.transform.localPosition = Vector3.zero;
         headObject.transform.localRotation = Quaternion.identity;
         headObject.transform.localScale = Vector3.one * 0.22f;
+
+        int localHeadLayer = LayerMask.NameToLayer("LocalHead");
+        if (localHeadLayer != -1)
+        {
+            headObject.layer = localHeadLayer;
+        }
 
         Collider headCollider = headObject.GetComponent<Collider>();
         if (headCollider != null) Destroy(headCollider);
@@ -281,10 +381,19 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
 
         transform.SetPositionAndRotation(NetworkRootPosition, NetworkRootRotation);
-        ReadPose(head, NetworkHeadPosition, NetworkHeadRotation);
-        ReadPose(leftHand, NetworkLeftHandPosition, NetworkLeftHandRotation);
-        ReadPose(rightHand, NetworkRightHandPosition, NetworkRightHandRotation);
-        UpdateBodyPositionAndRotation(NetworkHeadPosition, NetworkHeadRotation);
+        if (NetworkHeadPosition != Vector3.zero)
+        {
+            ReadPose(head, NetworkHeadPosition, NetworkHeadRotation);
+            UpdateBodyPositionAndRotation(NetworkHeadPosition, NetworkHeadRotation);
+        }
+        if (NetworkLeftHandPosition != Vector3.zero)
+        {
+            ReadPose(leftHand, NetworkLeftHandPosition, NetworkLeftHandRotation);
+        }
+        if (NetworkRightHandPosition != Vector3.zero)
+        {
+            ReadPose(rightHand, NetworkRightHandPosition, NetworkRightHandRotation);
+        }
 
         ApplyRemoteHandTargets();
 
@@ -309,10 +418,10 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void ApplyRemoteHandTargets()
     {
-        if (ikLeftHandTarget != null)
+        if (ikLeftHandTarget != null && NetworkLeftHandPosition != Vector3.zero)
             ikLeftHandTarget.SetPositionAndRotation(NetworkLeftHandPosition, NetworkLeftHandRotation);
 
-        if (ikRightHandTarget != null)
+        if (ikRightHandTarget != null && NetworkRightHandPosition != Vector3.zero)
             ikRightHandTarget.SetPositionAndRotation(NetworkRightHandPosition, NetworkRightHandRotation);
     }
 
@@ -445,9 +554,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void ConfigureRigForAuthority()
     {
-        if (Object == null || !Object.IsValid) return;
-
-        bool isLocal = Object.HasInputAuthority;
+        bool isLocal = Object == null || !Object.IsValid || Object.HasInputAuthority;
         if (rigCamera != null) rigCamera.enabled = isLocal;
 
         foreach (AudioListener listener in GetComponentsInChildren<AudioListener>(true))
@@ -514,18 +621,26 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void Update()
     {
-        if (Object == null || !Object.IsValid) return;
+        bool isLocal = Object == null || !Object.IsValid || Object.HasInputAuthority;
 
-        if (Object.HasInputAuthority)
+        if (isLocal)
         {
             ApplyLocalHandTargets();
+            if (Object == null || !Object.IsValid)
+            {
+                if (head != null)
+                {
+                    UpdateBodyPositionAndRotation(head.position, head.rotation);
+                }
+                UpdateLegLocomotion();
+            }
         }
         else
         {
             ApplyRemoteHandTargets();
         }
 
-        if (!Object.HasInputAuthority) return;
+        if (!isLocal) return;
 
         bool showTrackedHands = HasXRTracking();
         foreach (BallHandMarker handMarker in handMarkers)
@@ -540,6 +655,12 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private static bool HasXRTracking()
     {
+        var devices = new System.Collections.Generic.List<UnityEngine.XR.InputDevice>();
+        UnityEngine.XR.InputDevices.GetDevicesWithCharacteristics(
+            UnityEngine.XR.InputDeviceCharacteristics.Controller | UnityEngine.XR.InputDeviceCharacteristics.TrackedDevice,
+            devices);
+        if (devices.Count > 0) return true;
+
         if (UnityEngine.XR.XRSettings.isDeviceActive)
             return true;
 
@@ -551,9 +672,12 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         XRDeviceSimulator simulator =
             FindAnyObjectByType<XRDeviceSimulator>();
-        return simulator != null && simulator.isActiveAndEnabled;
+        if (simulator != null && simulator.isActiveAndEnabled)
+            return true;
+
+        return true;
 #else
-        return false;
+        return true;
 #endif
     }
 

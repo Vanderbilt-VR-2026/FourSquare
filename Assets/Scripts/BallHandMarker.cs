@@ -17,7 +17,7 @@ public class BallHandMarker : MonoBehaviour
     private int velocityIndex;
     private Renderer visualRenderer;
     private SphereCollider handCollider;
-    private bool visualVisible = true;
+    private bool visualVisible = false;
 
     public void SetPlayerRole(SquareRole role)
     {
@@ -86,7 +86,7 @@ public class BallHandMarker : MonoBehaviour
             return;
         }
 
-        visualRenderer.enabled = true;
+        visualRenderer.enabled = false;
         visualRenderer.sharedMaterial = visualMaterial;
     }
 
