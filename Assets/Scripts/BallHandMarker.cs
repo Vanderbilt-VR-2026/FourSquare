@@ -11,6 +11,10 @@ public class BallHandMarker : MonoBehaviour
     public Vector3 Velocity { get; private set; }
 
     private Vector3 previousPosition;
+    private Vector3 lastUpdatePosition;
+    private float lastUpdateTime;
+    private readonly Vector3[] recentVelocities = new Vector3[4];
+    private int velocityIndex;
     private Renderer visualRenderer;
     private SphereCollider handCollider;
 
@@ -41,6 +45,8 @@ public class BallHandMarker : MonoBehaviour
         handBody.isKinematic = true;
         handBody.useGravity = false;
         previousPosition = transform.position;
+        lastUpdatePosition = transform.position;
+        lastUpdateTime = Time.time;
     }
 
     private void CreateHandVisual()
@@ -89,12 +95,37 @@ public class BallHandMarker : MonoBehaviour
         if (handCollider != null) handCollider.enabled = active;
     }
 
+    private void Update()
+    {
+        float dt = Time.time - lastUpdateTime;
+        if (dt > 0.0001f)
+        {
+            Vector3 instantVelocity = (transform.position - lastUpdatePosition) / dt;
+            recentVelocities[velocityIndex] = instantVelocity;
+            velocityIndex = (velocityIndex + 1) % recentVelocities.Length;
+
+            Vector3 sum = Vector3.zero;
+            for (int i = 0; i < recentVelocities.Length; i++)
+            {
+                sum += recentVelocities[i];
+            }
+            Velocity = sum / recentVelocities.Length;
+            lastUpdatePosition = transform.position;
+            lastUpdateTime = Time.time;
+        }
+    }
+
     private void FixedUpdate()
     {
         float fixedDeltaTime = Time.fixedDeltaTime;
         if (fixedDeltaTime > 0f)
         {
-            Velocity = (transform.position - previousPosition) / fixedDeltaTime;
+            Vector3 fixedVel = (transform.position - previousPosition) / fixedDeltaTime;
+            // Fallback if Update didn't run or if fixed velocity is higher during sudden impulse
+            if (fixedVel.sqrMagnitude > Velocity.sqrMagnitude)
+            {
+                Velocity = fixedVel;
+            }
         }
 
         previousPosition = transform.position;

@@ -29,17 +29,16 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [Networked] public bool NetworkHasXRTracking { get; set; }
     [Networked] public int NetworkRole { get; set; }
 
-    public bool IsLocallyOwned => Object != null && Object.IsValid && Object.HasInputAuthority;
-    public bool HasPlayerInputAuthority =>
-        Object != null && Object.IsValid && Object.InputAuthority != PlayerRef.None;
+    public bool IsLocallyOwned => HasLocalAuthority;
+    public bool HasPlayerAuthority => PlayerAuthority != PlayerRef.None;
     public bool IsLocalCameraReady =>
         Object != null
         && Object.IsValid
-        && Object.HasInputAuthority
+        && HasLocalAuthority
         && rigCamera != null
         && rigCamera.isActiveAndEnabled;
     public Transform HeadTransform => head;
-    public int JoinOrder => Object != null && Object.IsValid ? Object.InputAuthority.PlayerId : int.MaxValue;
+    public int JoinOrder => HasPlayerAuthority ? PlayerAuthority.PlayerId : int.MaxValue;
     public int ConnectedPlayerCount
     {
         get
@@ -54,9 +53,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     public SquareRole PlayerRole => System.Enum.IsDefined(typeof(SquareRole), NetworkRole)
         ? (SquareRole)NetworkRole
         : SquareRole.Spectator;
-    public string PlayerId => Object != null && Object.IsValid ? Object.InputAuthority.ToString() : string.Empty;
+    public string PlayerId => HasPlayerAuthority ? PlayerAuthority.ToString() : string.Empty;
     public string DisplayName => Object != null && Object.IsValid
-        ? $"Player {Object.InputAuthority.PlayerId}"
+        ? $"Player {PlayerAuthority.PlayerId}"
         : "Unknown Player";
 
     private BallHandMarker[] handMarkers;
@@ -64,6 +63,17 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     private Renderer squareHeadRenderer;
     private Material squareHeadMaterial;
     private int lastAppliedRole = int.MinValue;
+    private bool HasLocalAuthority =>
+        Object != null
+        && Object.IsValid
+        && (Object.HasInputAuthority
+            || (Runner != null && Runner.GameMode == GameMode.Shared && Object.HasStateAuthority));
+    private PlayerRef PlayerAuthority =>
+        Object == null || !Object.IsValid
+            ? PlayerRef.None
+            : Runner != null && Runner.GameMode == GameMode.Shared
+                ? Object.StateAuthority
+                : Object.InputAuthority;
 
     private void Awake()
     {
@@ -120,10 +130,10 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     public override void Spawned()
     {
-        if (!HasPlayerInputAuthority)
+        if (!HasPlayerAuthority)
         {
             Debug.LogError(
-                "FourSquareFusionPlayer is attached to a scene NetworkObject with no player input authority. " +
+                "FourSquareFusionPlayer is attached to a NetworkObject with no player authority. " +
                 "Remove it from the scene rig; the Fusion player must be spawned from the VR Player prefab.",
                 this);
             return;
@@ -141,7 +151,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     public override void FixedUpdateNetwork()
     {
-        if (!Object.HasInputAuthority) return;
+        if (!HasLocalAuthority) return;
 
         CaptureLocalPose();
     }
@@ -172,7 +182,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         UpdateHandRoles();
 
-        if (Object.HasInputAuthority) return;
+        if (HasLocalAuthority) return;
 
         foreach (BallHandMarker handMarker in handMarkers)
         {
@@ -251,7 +261,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void ApplyRoleToLocalRig(SquareRole role)
     {
-        if (Object != null && Object.IsValid && Object.HasInputAuthority && xrOrigin != null)
+        if (HasLocalAuthority && xrOrigin != null)
         {
             PlayerJoinCourt.MoveJoinedPlayerToRole(xrOrigin, role);
         }
@@ -261,7 +271,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         if (Object == null || !Object.IsValid) return;
 
-        bool isLocal = Object.HasInputAuthority;
+        bool isLocal = HasLocalAuthority;
         if (rigCamera != null) rigCamera.enabled = isLocal;
 
         foreach (AudioListener listener in GetComponentsInChildren<AudioListener>(true))
@@ -308,7 +318,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void Update()
     {
-        if (Object == null || !Object.IsValid || !Object.HasInputAuthority) return;
+        if (Object == null || !Object.IsValid || !HasLocalAuthority) return;
 
         bool showTrackedHands = HasXRTracking();
         foreach (BallHandMarker handMarker in handMarkers)

@@ -11,9 +11,6 @@ GameObject:
   - component: {fileID: 3989726373372790981}
   - component: {fileID: 655161650674001684}
   - component: {fileID: 1706255222489798277}
-  - component: {fileID: 4266981963783383123}
-  - component: {fileID: 2865804342009129372}
-  - component: {fileID: 2993290913586584555}
   m_Layer: 0
   m_Name: BallVisual
   m_TagString: Untagged
@@ -31,7 +28,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.24, y: 0.24, z: 0.24}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 7863181790891994880}
@@ -93,159 +90,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!82 &4266981963783383123
-AudioSource:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3613870209328613739}
-  m_Enabled: 1
-  serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: 1480578428049096626, guid: 3e7ade205ba45430c9f792161d57660c, type: 2}
-  m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 0}
-  m_PlayOnAwake: 0
-  m_Volume: 1
-  m_Pitch: 1
-  Loop: 0
-  Mute: 0
-  Spatialize: 0
-  SpatializePostEffects: 0
-  Priority: 128
-  DopplerLevel: 1
-  MinDistance: 1
-  MaxDistance: 500
-  Pan2D: 0
-  rolloffMode: 0
-  BypassEffects: 0
-  BypassListenerEffects: 0
-  BypassReverbZones: 0
-  rolloffCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  panLevelCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  spreadCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  reverbZoneMixCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
---- !u!114 &2865804342009129372
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3613870209328613739}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
-  SortKey: 2742926567
-  SendPriority: 1
-  EnableInterpolation: 1
-  Flags: 262146
-  NestedObjects: []
-  NetworkedBehaviours:
-  - {fileID: 2993290913586584555}
-  ForceRemoteRenderTimeframe: 0
---- !u!114 &2993290913586584555
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3613870209328613739}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f1a1c0de7d3f4c9ab8e2a1b6c5d4e3f2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BallController
-  physicalCollider: {fileID: 0}
-  catchZone: {fileID: 0}
-  catchRadius: 0.8
-  ballRigidbody: {fileID: 0}
-  hitStrength: 1.5
-  minimumHandSpeed: 0.5
-  minimumHitVelocity: 1.5
-  maximumHitVelocity: 6
-  maximumAngularVelocity: 12
-  linearDamping: 0.15
-  hitCooldown: 0.2
-  awayDirectionBlend: 0.15
-  ballVisual: {fileID: 0}
-  squashStrength: 0.12
-  squashDuration: 0.12
-  ballAudioSource: {fileID: 0}
-  ballHitClip: {fileID: 8300000, guid: 32b98a34476654bb8b5f2c0acd5f92b1, type: 3}
-  ballBounceClip: {fileID: 8300000, guid: 231fc67c1780c4ed88af943a6bb0b2dc, type: 3}
-  bounceCooldown: 0.12
-  minimumBounceSpeed: 0.5
-  _NetworkPosition: {x: 0, y: 0, z: 0}
-  _NetworkRotation: {x: 0, y: 0, z: 0, w: 0}
-  _NetworkGameStarted:
-    RawValue: 0
 --- !u!1 &5025608827499203412
 GameObject:
   m_ObjectHideFlags: 0
@@ -258,8 +102,9 @@ GameObject:
   - component: {fileID: 4252656488524015188}
   - component: {fileID: 7396366840077207631}
   - component: {fileID: 837434839220053229}
-  - component: {fileID: 7869541523813990923}
   - component: {fileID: 5120154578535201304}
+  - component: {fileID: 2019485720194857201}
+  - component: {fileID: 7869541523813990923}
   - component: {fileID: 8252802612926192540}
   m_Layer: 0
   m_Name: Ball
@@ -277,8 +122,8 @@ Transform:
   m_GameObject: {fileID: 5025608827499203412}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.33, y: 6.37, z: 1.99}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.45, y: 0.45, z: 0.45}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 3989726373372790981}
@@ -293,7 +138,7 @@ Rigidbody:
   m_GameObject: {fileID: 5025608827499203412}
   serializedVersion: 5
   m_Mass: 1
-  m_LinearDamping: 0.15
+  m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
@@ -308,9 +153,9 @@ Rigidbody:
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
-  m_Interpolate: 1
+  m_Interpolate: 0
   m_Constraints: 0
-  m_CollisionDetection: 2
+  m_CollisionDetection: 0
 --- !u!135 &7396366840077207631
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -330,7 +175,7 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 0.12
+  m_Radius: 0.5
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!135 &837434839220053229
 SphereCollider:
@@ -351,44 +196,8 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 0.6096
+  m_Radius: 0.32
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &7869541523813990923
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5025608827499203412}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f1a1c0de7d3f4c9ab8e2a1b6c5d4e3f2, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BallController
-  physicalCollider: {fileID: 7396366840077207631}
-  catchZone: {fileID: 837434839220053229}
-  catchRadius: 0.6096
-  ballRigidbody: {fileID: 4252656488524015188}
-  hitStrength: 1.5
-  minimumHandSpeed: 0.5
-  minimumHitVelocity: 1.5
-  maximumHitVelocity: 8
-  maximumAngularVelocity: 12
-  linearDamping: 0.15
-  hitCooldown: 0.2
-  awayDirectionBlend: 0.15
-  ballVisual: {fileID: 3989726373372790981}
-  squashStrength: 0.12
-  squashDuration: 0.12
-  ballAudioSource: {fileID: 8252802612926192540}
-  ballHitClip: {fileID: 8300000, guid: 32b98a34476654bb8b5f2c0acd5f92b1, type: 3}
-  ballBounceClip: {fileID: 8300000, guid: 231fc67c1780c4ed88af943a6bb0b2dc, type: 3}
-  bounceCooldown: 0.12
-  minimumBounceSpeed: 0.5
-  _NetworkPosition: {x: 0, y: 0, z: 0}
-  _NetworkRotation: {x: 0, y: 0, z: 0, w: 0}
-  _NetworkGameStarted:
-    RawValue: 0
 --- !u!114 &5120154578535201304
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -404,12 +213,94 @@ MonoBehaviour:
   SortKey: 1808323596
   SendPriority: 1
   EnableInterpolation: 1
-  Flags: 262146
-  NestedObjects:
-  - {fileID: 2865804342009129372}
+  Flags: 262402
+  NestedObjects: []
   NetworkedBehaviours:
+  - {fileID: 2019485720194857201}
   - {fileID: 7869541523813990923}
   ForceRemoteRenderTimeframe: 0
+--- !u!114 &2019485720194857201
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5025608827499203412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 158639473, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkTransform
+  _stateAuthorityChangeErrorCorrectionDelta: 0
+  SyncScale: 0
+  SyncParent: 0
+  _autoAOIOverride: 1
+  ConfigFlags: 0
+  PhysicsSettings:
+    ForecastEnabled: 1
+    DebugPhysics: 0
+    GravityForecast: 2
+    MaxExtrapolationTime: 0.15
+    MinLinearDetectedError: 0.02
+    MinAngularDetectedError: 3
+    DeadzoneVelocityMode: 0
+    MaxLinearError: 0
+    MaxAngularError: 0
+    LowCorrectionProgressThreshold: 0.015
+    HighErrorSimilarityThreshold: 1
+    MaxErrorTotalTime: 0.5
+    MaxRemoteSleepIgnoreTime: 0.5
+    ErrorCorrectionType: 0
+    LinearVelCorrectionMul: 1
+    AngularVelCorrectionMul: 1
+    PositionCorrectionLerp: 0.15
+    RotationCorrectionLerp: 0.15
+    Spring: 75
+    Damper: 2
+    MinImpactfulCollisionAlignment: 0.3
+    ImpactStartCorrectionTime: 0.1
+    ImpactCorrectionTimeComplete: 0.3
+--- !u!114 &7869541523813990923
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5025608827499203412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3b91a27e45648f0a1c726354b8e90f1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkBallController
+  courtTargetManager: {fileID: 0}
+  ballRigidbody: {fileID: 4252656488524015188}
+  handHitZone: {fileID: 837434839220053229}
+  physicalCollider: {fileID: 7396366840077207631}
+  networkTransform: {fileID: 2019485720194857201}
+  ballAudioSource: {fileID: 8252802612926192540}
+  ballHitClip: {fileID: 8300000, guid: 32b98a34476654bb8b5f2c0acd5f92b1, type: 3}
+  ballBounceClip: {fileID: 8300000, guid: 231fc67c1780c4ed88af943a6bb0b2dc, type: 3}
+  bounceCooldown: 0.12
+  minimumBounceSpeed: 0.5
+  ballSpawnPoint: {fileID: 0}
+  fallbackDropPosition: {x: -1.28, y: 2.03, z: 39.38}
+  autoResetYThreshold: -4
+  outOfBoundsRespawnDelay: 3
+  groundSettledDuration: 1
+  restLinearSpeedThreshold: 0.15
+  restAngularSpeedThreshold: 0.6
+  groundCheckTolerance: 0.08
+  arcApexHeight: 1.25
+  minimumFlightTime: 0.65
+  maximumFlightTime: 2.5
+  sourceSquare: 3
+  horizontalStrikeDirection: {x: 0, y: 0, z: -1}
+  swingSpeed: 2.5
+  directionTurnSpeed: 90
+  keyboardHandStrikeKey: 102
+  handHitRadius: 0.32
+  minimumHandSpeed: 0.25
+  hitCooldown: 0.25
 --- !u!82 &8252802612926192540
 AudioSource:
   m_ObjectHideFlags: 0

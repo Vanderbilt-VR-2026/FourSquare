@@ -227,6 +227,64 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
             $"Spawned local VR Player for {runner.LocalPlayer} at {playerPosition}. " +
             $"XR camera active: {spawnedPlayer.GetComponent<FourSquareFusionPlayer>()?.IsLocalCameraReady}.",
             spawnedPlayer);
+
+        EnsureNetworkBallSpawned();
+    }
+
+    private void EnsureNetworkBallSpawned()
+    {
+        DisableLocalTestBall();
+
+        if (runner == null || !runner.IsRunning || !runner.IsSharedModeMasterClient)
+            return;
+
+        if (NetworkBallController.Instance != null || FindAnyObjectByType<NetworkBallController>() != null)
+            return;
+
+        GameObject prefabToSpawn = null;
+        Transform spawnPoint = null;
+
+        GameStateManager stateManager = GameStateManager.Instance;
+        if (stateManager != null)
+        {
+            prefabToSpawn = stateManager.BallPrefab;
+            spawnPoint = stateManager.BallSpawnPoint;
+        }
+
+        if (prefabToSpawn == null)
+        {
+            Debug.LogError("No ball prefab found in GameStateManager to spawn network ball.", this);
+            return;
+        }
+
+        NetworkObject networkBallPrefab = prefabToSpawn.GetComponent<NetworkObject>();
+        if (networkBallPrefab == null)
+        {
+            Debug.LogError("The ball prefab must contain a NetworkObject component.", prefabToSpawn);
+            return;
+        }
+
+        Vector3 spawnPosition = spawnPoint != null ? spawnPoint.position : transform.position;
+        Quaternion spawnRotation = spawnPoint != null ? spawnPoint.rotation : Quaternion.identity;
+
+        NetworkObject spawnedBall = runner.Spawn(networkBallPrefab, spawnPosition, spawnRotation);
+        if (spawnedBall != null)
+        {
+            Debug.Log($"[FourSquareFusionSession] Master Client successfully spawned network ball at {spawnPosition}.", spawnedBall);
+        }
+    }
+
+    private static void DisableLocalTestBall()
+    {
+        BallTrajectoryController[] testBalls = FindObjectsByType<BallTrajectoryController>(FindObjectsSortMode.None);
+        foreach (BallTrajectoryController testBall in testBalls)
+        {
+            if (testBall != null && testBall.gameObject.name == "Test Ball")
+            {
+                testBall.gameObject.SetActive(false);
+                Debug.Log("[FourSquareFusionSession] Disabled local Test Ball in City to avoid duplicate physical balls.", testBall);
+            }
+        }
     }
 
     private void GetLocalPlayerSpawn(out Vector3 position, out Quaternion rotation)
@@ -320,7 +378,10 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
     public void OnSceneLoadDone(NetworkRunner callbackRunner)
     {
         if (callbackRunner == runner)
+        {
             SpawnLocalPlayer();
+            EnsureNetworkBallSpawned();
+        }
     }
     public void OnSceneLoadStart(NetworkRunner callbackRunner) { }
 }
