@@ -41,6 +41,13 @@ public class StartScreenUI : MonoBehaviour
     [Header("Multiplayer")]
     [SerializeField] private MultiplayerRoomManager multiplayerRoomManager;
 
+
+    [Header("How To Play")]
+    [SerializeField] private Button howToPlayButton;
+    [SerializeField] private Button howToPlayBackButton;
+    [SerializeField] private GameObject howToPlayPanel;
+     
+     
     private string currentRoomCode;
     private bool isConnecting = false;
 
@@ -119,6 +126,13 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.onClick.AddListener(OnJoinRoomConfirmed);
+
+        if (howToPlayButton != null)
+            howToPlayButton.onClick.AddListener(ShowHowToPlayPanel);
+
+        if (howToPlayBackButton != null)
+            howToPlayBackButton.onClick.AddListener(ShowStartScreen);
+            
     }
 
     private void OnDisable()
@@ -140,6 +154,12 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.onClick.RemoveListener(OnJoinRoomConfirmed);
+
+        if (howToPlayButton != null)
+            howToPlayButton.onClick.RemoveListener(ShowHowToPlayPanel);
+
+        if (howToPlayBackButton != null)
+            howToPlayBackButton.onClick.RemoveListener(ShowStartScreen);
     }
 
     private void SetAllPanelsInactive()
@@ -155,6 +175,9 @@ public class StartScreenUI : MonoBehaviour
 
         if (roomLobbyPanel != null)
             roomLobbyPanel.SetActive(false);
+
+        if (howToPlayPanel != null)
+            howToPlayPanel.SetActive(false);
     }
 
     private void ShowStartScreen()
@@ -179,6 +202,17 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomPanel != null)
             joinRoomPanel.SetActive(true);
+    }
+
+    private void ShowHowToPlayPanel()
+    {
+        if (isConnecting)
+            return;
+
+        SetAllPanelsInactive();
+
+        if (howToPlayPanel != null)
+            howToPlayPanel.SetActive(true);
     }
 
     private void ShowLobby()
