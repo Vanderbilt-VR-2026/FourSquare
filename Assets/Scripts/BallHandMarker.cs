@@ -4,6 +4,7 @@ public class BallHandMarker : MonoBehaviour
 {
     [SerializeField] private float handColliderRadius = 0.08f;
     [SerializeField, Min(0.01f)] private float visualCubeSize = 0.12f;
+    [SerializeField] private GameObject handVisualPrefab;
     [SerializeField] private Material visualMaterial;
     [SerializeField] private SquareRole playerRole = SquareRole.Spectator;
 
@@ -15,7 +16,7 @@ public class BallHandMarker : MonoBehaviour
     private float lastUpdateTime;
     private readonly Vector3[] recentVelocities = new Vector3[4];
     private int velocityIndex;
-    private Renderer visualRenderer;
+    private Renderer[] visualRenderers;
     private SphereCollider handCollider;
 
     public void SetPlayerRole(SquareRole role)
@@ -51,6 +52,36 @@ public class BallHandMarker : MonoBehaviour
 
     private void CreateHandVisual()
     {
+        if (handVisualPrefab != null)
+        {
+            Renderer[] existingRenderers = GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer existingRenderer in existingRenderers)
+            {
+                if (existingRenderer.transform != transform)
+                    existingRenderer.gameObject.SetActive(false);
+            }
+
+            GameObject handVisual = Instantiate(handVisualPrefab, transform, false);
+            handVisual.name = handVisualPrefab.name;
+            foreach (Behaviour behaviour in handVisual.GetComponentsInChildren<Behaviour>(true))
+            {
+                behaviour.enabled = false;
+            }
+
+            visualRenderers = handVisual.GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer renderer in visualRenderers)
+            {
+                if (renderer != null) renderer.enabled = false;
+            }
+
+            if (visualRenderers.Length == 0)
+            {
+                Debug.LogError($"Hand visual prefab '{handVisualPrefab.name}' has no renderers.", handVisualPrefab);
+            }
+            return;
+        }
+
+        Renderer visualRenderer = null;
         Renderer[] childRenderers = GetComponentsInChildren<Renderer>(true);
         foreach (Renderer childRenderer in childRenderers)
         {
@@ -78,6 +109,7 @@ public class BallHandMarker : MonoBehaviour
             visualRenderer = visual.GetComponent<Renderer>();
         }
 
+        visualRenderers = new[] { visualRenderer };
         if (visualMaterial == null)
         {
             Debug.LogError("Assign a build-included material to the hand marker visual.", this);
@@ -91,7 +123,14 @@ public class BallHandMarker : MonoBehaviour
 
     public void SetTrackingActive(bool active)
     {
-        if (visualRenderer != null) visualRenderer.enabled = active && visualMaterial != null;
+        if (visualRenderers != null)
+        {
+            bool hasVisual = handVisualPrefab != null || visualMaterial != null;
+            foreach (Renderer renderer in visualRenderers)
+            {
+                if (renderer != null) renderer.enabled = active && hasVisual;
+            }
+        }
         if (handCollider != null) handCollider.enabled = active;
     }
 

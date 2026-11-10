@@ -281,6 +281,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
   visualCubeSize: 0.12
+  handVisualPrefab: {fileID: 8758423527188247893, guid: 1392f805216c47742996d4742c80721c, type: 3}
   visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   playerRole: 0
 --- !u!1 &1324493728189623182
@@ -495,6 +496,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
   visualCubeSize: 0.12
+  handVisualPrefab: {fileID: 4283425761326543017, guid: 9f3369e30fbd31f4bb596b1a99babe83, type: 3}
   visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
   playerRole: 0
 --- !u!1 &2564747234580309914
