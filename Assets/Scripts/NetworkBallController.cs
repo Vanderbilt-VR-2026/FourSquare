@@ -24,6 +24,7 @@ public class NetworkBallController : NetworkBehaviour
     [SerializeField] private SphereCollider handHitZone;
     [SerializeField] private SphereCollider physicalCollider;
     [SerializeField] private NetworkTransform networkTransform;
+    [SerializeField] private FoursquareBall foursquareBall;
 
     [Header("Ball Audio")]
     [SerializeField] private AudioSource ballAudioSource;
@@ -75,18 +76,31 @@ public class NetworkBallController : NetworkBehaviour
 
     [Header("Hand Test Input")]
     [SerializeField, Min(0.01f)] private float handHitRadius = 0.32f;
-    [SerializeField, Min(0f)] private float minimumHandSpeed = 0.25f;
+    [Tooltip("Minimum hand speed required for a deliberate strike; slow touches do not count as hits.")]
+    [SerializeField, Min(0f)] private float minimumHandSpeed = 1f;
+    [Tooltip("Minimum part of the hand velocity that must be moving toward the ball.")]
+    [SerializeField, Min(0f)] private float minimumHandApproachSpeed = 0.2f;
     [SerializeField, Min(0f)] private float hitCooldown = 0.25f;
 
     private readonly Dictionary<BallHandMarker, float> lastHitTimes =
         new Dictionary<BallHandMarker, float>();
+    private readonly Dictionary<SquareRole, float> lastAuthoritativeHitTimes =
+        new Dictionary<SquareRole, float>();
 
-    public bool HasGameplayAuthority => Object != null && Object.IsValid && Object.HasStateAuthority;
+    public bool HasGameplayAuthority =>
+        Object == null || !Object.IsValid || Object.HasStateAuthority;
     public bool IsNetworked => Object != null && Object.IsValid;
 
     public bool StartGameFromManager(bool startingRolesAssigned)
     {
+        if (IsNetworked && !HasGameplayAuthority)
+            return false;
+
         ResetBall();
+        GameStateManager.Instance?.ApplyNetworkGameStarted();
+        FoursquareGameManager.Instance?.ApplyNetworkState((int)FoursquareGameState.Playing);
+        if (IsNetworked)
+            RPC_NotifyGamePhase((int)FoursquareGameState.Playing);
         return true;
     }
 
@@ -102,6 +116,8 @@ public class NetworkBallController : NetworkBehaviour
 
         if (networkTransform == null)
             networkTransform = GetComponent<NetworkTransform>();
+        if (foursquareBall == null)
+            foursquareBall = GetComponent<FoursquareBall>();
 
         if (ballAudioSource == null)
             ballAudioSource = GetComponent<AudioSource>();
@@ -119,10 +135,30 @@ public class NetworkBallController : NetworkBehaviour
     public override void Spawned()
     {
         ConfigurePhysicsForAuthority();
+        IgnorePlayerBodyCollisions();
 
         if (Object.HasStateAuthority)
         {
             ResetBall();
+        }
+    }
+
+    public void IgnorePlayerBodyCollision(Collider bodyCollider)
+    {
+        if (physicalCollider == null || bodyCollider == null || bodyCollider == physicalCollider)
+            return;
+
+        Physics.IgnoreCollision(physicalCollider, bodyCollider, true);
+    }
+
+    private void IgnorePlayerBodyCollisions()
+    {
+        FourSquareFusionPlayer[] players =
+            FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+        foreach (FourSquareFusionPlayer player in players)
+        {
+            if (player != null)
+                player.IgnoreBallBodyCollision(this);
         }
     }
 
@@ -282,6 +318,13 @@ public class NetworkBallController : NetworkBehaviour
 
     private Vector3 GetSpawnPosition()
     {
+        FoursquareCourt court = FoursquareCourt.Instance;
+        if (court != null && court.TryGetKingServePose(out Vector3 servePosition, out _))
+            return servePosition;
+
+        if (PlayerJoinCourt.TryGetKingBallSpawnPose(out Vector3 kingPosition, out _))
+            return kingPosition;
+
         FindSpawnPointReference();
         if (ballSpawnPoint != null)
             return ballSpawnPoint.position;
@@ -291,6 +334,13 @@ public class NetworkBallController : NetworkBehaviour
 
     private Quaternion GetSpawnRotation()
     {
+        FoursquareCourt court = FoursquareCourt.Instance;
+        if (court != null && court.TryGetKingServePose(out _, out Quaternion serveRotation))
+            return serveRotation;
+
+        if (PlayerJoinCourt.TryGetKingBallSpawnPose(out _, out Quaternion kingRotation))
+            return kingRotation;
+
         FindSpawnPointReference();
         if (ballSpawnPoint != null)
             return ballSpawnPoint.rotation;
@@ -312,18 +362,24 @@ public class NetworkBallController : NetworkBehaviour
 
     public void RequestHit(Vector3 strikeOrigin, Vector3 strikeDirection, float strikeSpeed, int launchingSquare)
     {
+        SquareRole hitterRole = GetLocalPlayerRole(launchingSquare);
         if (HasGameplayAuthority)
         {
-            TryLaunchAuthoritative(strikeOrigin, strikeDirection, strikeSpeed, launchingSquare);
+            TryLaunchAuthoritative(strikeOrigin, strikeDirection, strikeSpeed, launchingSquare, hitterRole);
         }
         else if (Object != null && Object.IsValid)
         {
             PlayBallHitSound();
-            RPC_RequestHit(strikeOrigin, strikeDirection, strikeSpeed, launchingSquare);
+            RPC_RequestHit(strikeOrigin, strikeDirection, strikeSpeed, launchingSquare, (int)hitterRole);
         }
     }
 
-    private bool TryLaunchAuthoritative(Vector3 strikeOrigin, Vector3 strikeDirection, float strikeSpeed, int launchingSquare)
+    private bool TryLaunchAuthoritative(
+        Vector3 strikeOrigin,
+        Vector3 strikeDirection,
+        float strikeSpeed,
+        int launchingSquare,
+        SquareRole hitterRole)
     {
         if (courtTargetManager == null)
             courtTargetManager = FindFirstObjectByType<CourtTargetManager>();
@@ -335,8 +391,50 @@ public class NetworkBallController : NetworkBehaviour
         }
 
         CourtTargetManager.TargetSelection selection = default;
-        if (courtTargetManager.TryGetTarget(launchingSquare, strikeOrigin, strikeDirection,
-            strikeSpeed, out selection))
+        bool targetFound = courtTargetManager.TryGetTarget(
+            launchingSquare, strikeOrigin, strikeDirection, strikeSpeed, out selection);
+
+        FoursquareGameManager gameManager = FoursquareGameManager.Instance;
+        if (gameManager == null)
+        {
+            Debug.LogError(
+                "Foursquare rules are not active: City is missing FoursquareGameManager. " +
+                "Run FourSquare > Configure Fusion Gameplay in the Unity Editor.",
+                this);
+            return false;
+        }
+
+        if (gameManager.CurrentState != FoursquareGameState.Playing)
+            return false;
+
+        if (lastAuthoritativeHitTimes.TryGetValue(hitterRole, out float lastHitTime) &&
+            Time.time < lastHitTime + hitCooldown)
+        {
+            Debug.Log(
+                $"[NetworkBallController] Ignored duplicate hit from {hitterRole} " +
+                $"within the {hitCooldown:0.##}s hit cooldown.",
+                this);
+            return false;
+        }
+
+        lastAuthoritativeHitTimes[hitterRole] = Time.time;
+
+        if (foursquareBall == null)
+            foursquareBall = GetComponent<FoursquareBall>();
+        if (foursquareBall == null)
+        {
+            Debug.LogError(
+                "FoursquareGameManager is active, but the network ball has no FoursquareBall rule tracker.",
+                this);
+            return false;
+        }
+        if (!foursquareBall.RegisterPlayerHit(
+            hitterRole, targetFound ? selection.targetSquare : -1))
+        {
+            return false;
+        }
+
+        if (targetFound)
         {
             LaunchAt(selection.position, strikeOrigin, strikeSpeed);
             PlayBallHitSound();
@@ -356,15 +454,15 @@ public class NetworkBallController : NetworkBehaviour
         TryHitWithHand(other);
     }
 
-    private void OnTriggerStay(Collider other)
-    {
-        TryHitWithHand(other);
-    }
-
     private void TryHitWithHand(Collider other)
     {
         BallHandMarker hand = other.GetComponentInParent<BallHandMarker>();
         if (hand == null)
+            return;
+
+        FourSquareFusionPlayer handOwner =
+            hand.GetComponentInParent<FourSquareFusionPlayer>();
+        if (IsNetworked && (handOwner == null || !handOwner.IsLocallyOwned))
             return;
 
         if (lastHitTimes.TryGetValue(hand, out float lastHitTime)
@@ -374,15 +472,16 @@ public class NetworkBallController : NetworkBehaviour
         }
 
         Vector3 handVel = hand.Velocity;
-        Vector3 handVelHorizontal = Vector3.ProjectOnPlane(handVel, Vector3.up);
-        Vector3 handToBall = Vector3.ProjectOnPlane(transform.position - hand.transform.position, Vector3.up);
-
         float handSpeed = handVel.magnitude;
-        if (handSpeed < minimumHandSpeed && handVelHorizontal.magnitude < 0.15f)
-        {
+        Vector3 toBall = transform.position - hand.transform.position;
+        float approachSpeed = toBall.sqrMagnitude > 0.0001f
+            ? Vector3.Dot(handVel, toBall.normalized)
+            : 0f;
+        if (handSpeed < minimumHandSpeed || approachSpeed < minimumHandApproachSpeed)
             return;
-        }
 
+        Vector3 handVelHorizontal = Vector3.ProjectOnPlane(handVel, Vector3.up);
+        Vector3 handToBall = Vector3.ProjectOnPlane(toBall, Vector3.up);
         Vector3 strikeDirection;
         if (handVelHorizontal.sqrMagnitude > 0.04f)
         {
@@ -405,41 +504,86 @@ public class NetworkBallController : NetworkBehaviour
             : sourceSquare;
 
         lastHitTimes[hand] = Time.time;
+        Debug.Log(
+            $"[NetworkBallController] Intentional hand strike detected: role={hand.PlayerRole}, " +
+            $"speed={handSpeed:F2} m/s, approach={approachSpeed:F2} m/s, square={currentSquare}.",
+            this);
 
         if (HasGameplayAuthority)
         {
-            CourtTargetManager.TargetSelection selection = default;
-            bool targetFound = courtTargetManager != null && courtTargetManager.TryGetTarget(
-                currentSquare, transform.position, strikeDirection, strikeSpeed, out selection);
-
-            if (targetFound)
-            {
-                LaunchAt(selection.position, transform.position, strikeSpeed);
-                PlayBallHitSound();
-                Debug.Log($"[NetworkBallController] Guided hit to square {selection.targetSquare}, sub-square ({selection.column}, {selection.row}) at {strikeSpeed:0.#} m/s.", this);
-            }
-            else
-            {
-                LaunchOutOfBounds(handVel);
-                PlayBallHitSound();
-                string reason = !string.IsNullOrEmpty(selection.failureReason) ? selection.failureReason : "Strike was off target.";
-                Debug.LogWarning($"[NetworkBallController] Strike marked Out of Bounds: {reason}. Ball flying off with physics.", this);
-            }
+            TryLaunchAuthoritative(
+                transform.position, strikeDirection, strikeSpeed, currentSquare, hand.PlayerRole);
         }
         else if (Object != null && Object.IsValid)
         {
             PlayBallHitSound();
-            RPC_RequestHit(transform.position, strikeDirection, strikeSpeed, currentSquare);
+            RPC_RequestHit(
+                transform.position, strikeDirection, strikeSpeed, currentSquare, (int)hand.PlayerRole);
         }
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
-    public void RPC_RequestHit(Vector3 strikeOrigin, Vector3 strikeDirection, float strikeSpeed, int launchingSquare)
+    public void RPC_RequestHit(
+        Vector3 strikeOrigin,
+        Vector3 strikeDirection,
+        float strikeSpeed,
+        int launchingSquare,
+        int hitterRole,
+        RpcInfo info = default)
     {
         if (!HasGameplayAuthority)
             return;
 
-        TryLaunchAuthoritative(strikeOrigin, strikeDirection, strikeSpeed, launchingSquare);
+        if (!System.Enum.IsDefined(typeof(SquareRole), hitterRole) ||
+            hitterRole == (int)SquareRole.Spectator ||
+            !IsPlayerAuthorizedForRole(info.Source, (SquareRole)hitterRole))
+        {
+            Debug.LogWarning($"Ignoring ball-hit request with invalid player role {hitterRole}.", this);
+            return;
+        }
+
+        TryLaunchAuthoritative(
+            strikeOrigin, strikeDirection, strikeSpeed, launchingSquare, (SquareRole)hitterRole);
+    }
+
+    [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
+    public void RPC_NotifyGamePhase(int stateValue)
+    {
+        if (Object != null && Object.IsValid && Object.HasStateAuthority)
+            return;
+
+        FoursquareGameManager.Instance?.ApplyNetworkState(stateValue);
+        if (stateValue == (int)FoursquareGameState.Playing)
+            GameStateManager.Instance?.ApplyNetworkGameStarted();
+    }
+
+    private static bool IsPlayerAuthorizedForRole(PlayerRef source, SquareRole role)
+    {
+        FourSquareFusionPlayer[] players =
+            FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+        foreach (FourSquareFusionPlayer player in players)
+        {
+            if (player != null && player.PlayerId == source.ToString())
+                return player.PlayerRole == role;
+        }
+
+        return false;
+    }
+
+    private static SquareRole GetLocalPlayerRole(int fallbackSquare)
+    {
+        FourSquareFusionPlayer[] players =
+            FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+        foreach (FourSquareFusionPlayer player in players)
+        {
+            if (player != null && player.IsLocallyOwned &&
+                player.PlayerRole != SquareRole.Spectator)
+            {
+                return player.PlayerRole;
+            }
+        }
+
+        return FoursquareCourt.GetRoleForSquare(fallbackSquare);
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -693,6 +837,7 @@ public class NetworkBallController : NetworkBehaviour
     {
         handHitRadius = Mathf.Max(0.01f, handHitRadius);
         minimumHandSpeed = Mathf.Max(0f, minimumHandSpeed);
+        minimumHandApproachSpeed = Mathf.Max(0f, minimumHandApproachSpeed);
         hitCooldown = Mathf.Max(0f, hitCooldown);
         arcApexHeight = Mathf.Max(0.3f, arcApexHeight);
         minimumFlightTime = Mathf.Max(0.2f, minimumFlightTime);

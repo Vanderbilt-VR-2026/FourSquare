@@ -500,7 +500,7 @@ public class PlayerJoinCourt : MonoBehaviour
 
     private static int GetSpawnIndex(SquareRole role)
     {
-        return (int)SquareRole.King - (int)role;
+        return (int)role - (int)SquareRole.Peasant;
     }
 
     private Transform FindAvailableSpawn()
@@ -884,6 +884,12 @@ public class PlayerJoinCourt : MonoBehaviour
         startButton.targetGraphic = startButtonImage;
         startButton.onClick.AddListener(() =>
         {
+            if (FoursquareGameManager.Instance != null)
+            {
+                FoursquareGameManager.Instance.StartGame();
+                return;
+            }
+
             if (GameStateManager.Instance == null)
             {
                 Debug.LogError("The Start Game button was pressed, but no GameStateManager exists in the scene.");

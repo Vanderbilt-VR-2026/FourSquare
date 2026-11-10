@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using Fusion;
 using UnityEngine;
 using Unity.XR.CoreUtils;
+using TMPro;
 #if UNITY_EDITOR
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Simulation;
 #endif
@@ -13,6 +15,11 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [SerializeField] private Transform head;
     [SerializeField] private Transform leftHand;
     [SerializeField] private Transform rightHand;
+
+    [Header("Nameplate")]
+    [SerializeField] private PlayerNameplate nameplatePrefab;
+    [SerializeField] private Vector3 nameplateOffset = new Vector3(0f, 0.3f, 0f);
+    [SerializeField] private bool showLocalNameplate;
 
     [Header("Remote Rig")]
     [SerializeField] private Renderer[] avatarRenderers;
@@ -59,10 +66,15 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         : "Unknown Player";
 
     private BallHandMarker[] handMarkers;
+    private Collider[] bodyColliders;
+    private Behaviour[] locomotionProviders;
+    private bool[] locomotionProviderInitiallyEnabled;
     private Camera rigCamera;
     private Renderer squareHeadRenderer;
     private Material squareHeadMaterial;
     private int lastAppliedRole = int.MinValue;
+    private bool movementLockApplied;
+    private bool movementLocked;
     private bool HasLocalAuthority =>
         Object != null
         && Object.IsValid
@@ -89,6 +101,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         rigCamera = head != null ? head.GetComponent<Camera>() : GetComponentInChildren<Camera>(true);
         handMarkers = GetComponentsInChildren<BallHandMarker>(true);
+        bodyColliders = GetComponents<Collider>();
+        CacheLocomotionProviders();
     }
 
     private void CreateSquareHead()
@@ -146,6 +160,11 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
 
         ConfigureRigForAuthority();
+        UpdateGameplayMovementLock(force: true);
+        ApplyBallBodyCollisionFilter();
+        CreateNameplate();
+        if (HasLocalAuthority)
+            CreateCityLobbyDisplay();
         GameStateManager.Instance?.RegisterNetworkPlayer(this);
     }
 
@@ -245,6 +264,29 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
     }
 
+    public void IgnoreBallBodyCollision(NetworkBallController networkBall)
+    {
+        if (networkBall == null)
+            return;
+
+        if (bodyColliders == null || bodyColliders.Length == 0)
+            bodyColliders = GetComponents<Collider>();
+
+        foreach (Collider bodyCollider in bodyColliders)
+        {
+            if (bodyCollider != null)
+                networkBall.IgnorePlayerBodyCollision(bodyCollider);
+        }
+    }
+
+    private void ApplyBallBodyCollisionFilter()
+    {
+        NetworkBallController[] networkBalls =
+            FindObjectsByType<NetworkBallController>(FindObjectsSortMode.None);
+        foreach (NetworkBallController networkBall in networkBalls)
+            IgnoreBallBodyCollision(networkBall);
+    }
+
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
     public void RPC_SetRole(int role)
     {
@@ -287,9 +329,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             }
 
             string typeName = behaviour.GetType().Name;
-            if (typeName == "TrackedPoseDriver"
-                || typeName == "ContinuousMoveProvider" || typeName == "SnapTurnProvider"
-                || typeName == "ContinuousTurnProvider" || typeName == "LocomotionMediator")
+            if (typeName == "TrackedPoseDriver")
             {
                 behaviour.enabled = isLocal;
             }
@@ -316,15 +356,121 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
     }
 
+    private void CreateNameplate()
+    {
+        if (head == null)
+        {
+            Debug.LogError("Cannot create player nameplate because the XR head transform is not assigned.", this);
+            return;
+        }
+
+        PlayerNameplate nameplate;
+        if (nameplatePrefab != null)
+        {
+            nameplate = Instantiate(nameplatePrefab);
+        }
+        else
+        {
+            GameObject nameplateObject = new GameObject("Runtime Player Nameplate");
+            TextMeshPro runtimeText = nameplateObject.AddComponent<TextMeshPro>();
+            runtimeText.fontSize = 4f;
+            runtimeText.alignment = TextAlignmentOptions.Center;
+            nameplateObject.transform.localScale = Vector3.one * 0.01f;
+            nameplate = nameplateObject.AddComponent<PlayerNameplate>();
+            Debug.LogWarning(
+                "No nameplate prefab is assigned; using a basic runtime TextMeshPro nameplate.",
+                this);
+        }
+
+        nameplate.Initialize(
+            head,
+            DisplayName,
+            HasLocalAuthority ? rigCamera : Camera.main,
+            nameplateOffset,
+            HasLocalAuthority && !showLocalNameplate);
+    }
+
+    private void CreateCityLobbyDisplay()
+    {
+        if (head == null)
+        {
+            Debug.LogError(
+                "Cannot show City lobby status because the local XR head transform is not assigned.",
+                this);
+            return;
+        }
+
+        GameObject displayObject = new GameObject("City Lobby Status");
+        CityLobbyDisplay display = displayObject.AddComponent<CityLobbyDisplay>();
+        display.Initialize(head, rigCamera);
+    }
+
     private void Update()
     {
         if (Object == null || !Object.IsValid || !HasLocalAuthority) return;
+
+        UpdateGameplayMovementLock();
 
         bool showTrackedHands = HasXRTracking();
         foreach (BallHandMarker handMarker in handMarkers)
         {
             if (handMarker != null) handMarker.SetTrackingActive(showTrackedHands);
         }
+    }
+
+    private void CacheLocomotionProviders()
+    {
+        List<Behaviour> providers = new List<Behaviour>();
+        List<bool> initiallyEnabled = new List<bool>();
+        Behaviour[] behaviours = GetComponentsInChildren<Behaviour>(true);
+        foreach (Behaviour behaviour in behaviours)
+        {
+            if (behaviour == null || !IsLocomotionProvider(behaviour.GetType().Name))
+                continue;
+
+            providers.Add(behaviour);
+            initiallyEnabled.Add(behaviour.enabled);
+        }
+
+        locomotionProviders = providers.ToArray();
+        locomotionProviderInitiallyEnabled = initiallyEnabled.ToArray();
+    }
+
+    private void UpdateGameplayMovementLock(bool force = false)
+    {
+        FoursquareGameManager gameManager = FoursquareGameManager.Instance;
+        bool gameInProgress = gameManager != null
+            ? gameManager.CurrentState == FoursquareGameState.Playing
+            : GameStateManager.Instance != null && GameStateManager.Instance.HasGameStarted;
+
+        if (!force && movementLockApplied && movementLocked == gameInProgress)
+            return;
+
+        movementLocked = gameInProgress;
+        movementLockApplied = true;
+
+        if (locomotionProviders == null)
+            CacheLocomotionProviders();
+
+        for (int i = 0; i < locomotionProviders.Length; i++)
+        {
+            Behaviour provider = locomotionProviders[i];
+            if (provider == null)
+                continue;
+
+            bool wasEnabled = i < locomotionProviderInitiallyEnabled.Length &&
+                              locomotionProviderInitiallyEnabled[i];
+            provider.enabled = HasLocalAuthority && wasEnabled && !movementLocked;
+        }
+    }
+
+    private static bool IsLocomotionProvider(string typeName)
+    {
+        return typeName == "ContinuousMoveProvider" ||
+               typeName == "SnapTurnProvider" ||
+               typeName == "ContinuousTurnProvider" ||
+               typeName == "TeleportationProvider" ||
+               typeName == "ClimbProvider";
     }
 
     private static bool HasXRTracking()

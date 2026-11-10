@@ -38158,67 +38158,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 400000, guid: 2aeea187d4a9dce4da2f26d62f5bbc96, type: 3}
   m_PrefabInstance: {fileID: 423454835}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &425026175
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 350774810742917943, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: SortKey
-      value: 3723559529
-      objectReference: {fileID: 0}
-    - target: {fileID: 992349184629936267, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_Name
-      value: VR Player
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0.26912
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.005
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 1.35967
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6118252723700984474, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
 --- !u!1 &427014010
 GameObject:
   m_ObjectHideFlags: 0
@@ -54498,6 +54437,7 @@ GameObject:
   - component: {fileID: 632038652}
   - component: {fileID: 632038653}
   - component: {fileID: 632038654}
+  - component: {fileID: 632038655}
   m_Layer: 0
   m_Name: Game Court
   m_TagString: Untagged
@@ -54525,6 +54465,7 @@ Transform:
   - {fileID: 677163921}
   - {fileID: 1525908581}
   - {fileID: 1744264825}
+  - {fileID: 1104708176}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &632038652
@@ -54562,7 +54503,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FourSquareFusionSession
   sessionName: FourSquareVR
   maximumPlayers: 4
-  connectOnStart: 0
+  connectOnStart: 1
   disableXRInEditor: 0
   playerPrefab: {fileID: 350774810742917943, guid: 3f8857320221f1446b76ea29cdf946e3, type: 3}
   playerSpawnPoint: {fileID: 580323501}
@@ -54586,6 +54527,22 @@ MonoBehaviour:
   maximumSwingSpeed: 4.8
   showVisualGridInGame: 0
   showTargetIndicator: 1
+--- !u!114 &632038655
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 632038650}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a19d8c4f6b2e4137a5d0c9f8e6b4a213, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FoursquareGameManager
+  gameStateManager: {fileID: 632038652}
+  court: {fileID: 1104708177}
+  ball: {fileID: 1443982759}
+  networkBall: {fileID: 1443982760}
 --- !u!1 &636922459
 GameObject:
   m_ObjectHideFlags: 0
@@ -87178,7 +87135,7 @@ GameObject:
   - component: {fileID: 927862967}
   - component: {fileID: 927862966}
   m_Layer: 0
-  m_Name: Square_4
+  m_Name: Square_1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -87211,7 +87168,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ab7adc1ea30f4244a756ed7b197d207, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CourtSquare
-  squareID: 4
+  squareID: 1
 --- !u!64 &927862967
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -104988,6 +104945,79 @@ Mesh:
       - serializedVersion: 1
         m_IndexStart: 0
         m_IndexCount: 0
+--- !u!1 &1104708175
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1104708176}
+  - component: {fileID: 1104708178}
+  - component: {fileID: 1104708177}
+  m_Layer: 0
+  m_Name: Ball Out Of Bounds Bounds
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1104708176
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1104708175}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.27, y: 0.00000041537, z: -1.31}
+  m_LocalScale: {x: 5.1731696, y: 11.665767, z: 5.2990155}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 632038651}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1104708177
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1104708175}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b28e9d5a7c3f4a1b8d6e0c2f9a5b7314, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FoursquareCourt
+  courtBounds: {fileID: 677163922}
+  squareSpawnPoints:
+  - {fileID: 1604830114}
+  - {fileID: 1614564537}
+  - {fileID: 1475596676}
+  - {fileID: 927862965}
+  kingServePoint: {fileID: 0}
+--- !u!65 &1104708178
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1104708175}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 100, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!43 &1105847671
 Mesh:
   m_ObjectHideFlags: 0
@@ -137617,7 +137647,10 @@ GameObject:
   - component: {fileID: 1443982755}
   - component: {fileID: 1443982754}
   - component: {fileID: 1443982753}
-  - component: {fileID: 1443982752}
+  - component: {fileID: 1443982762}
+  - component: {fileID: 1443982761}
+  - component: {fileID: 1443982760}
+  - component: {fileID: 1443982759}
   m_Layer: 0
   m_Name: Test Ball
   m_TagString: Untagged
@@ -137625,40 +137658,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1443982752
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1443982751}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 63448aae82ecf6c47a8adffce14a962d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BallTrajectoryController
-  courtTargetManager: {fileID: 632038654}
-  ballRigidbody: {fileID: 1443982753}
-  handHitZone: {fileID: 1443982758}
-  physicalCollider: {fileID: 1443982755}
-  initialDropPosition: {x: -1.28, y: 2.03, z: 39.38}
-  autoResetYThreshold: -4
-  outOfBoundsRespawnDelay: 3
-  groundSettledDuration: 1
-  restLinearSpeedThreshold: 0.15
-  restAngularSpeedThreshold: 0.6
-  groundCheckTolerance: 0.08
-  arcApexHeight: 1.25
-  minimumFlightTime: 0.65
-  maximumFlightTime: 2.5
-  sourceSquare: 3
-  horizontalStrikeDirection: {x: 0, y: 0, z: -1}
-  swingSpeed: 2.5
-  directionTurnSpeed: 90
-  keyboardHandStrikeKey: 102
-  handHitRadius: 0.32
-  minimumHandSpeed: 0.25
-  hitCooldown: 0.25
 --- !u!54 &1443982753
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -137800,6 +137799,124 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.32
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &1443982759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1443982751}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c37fae6b8d4a5c2e9f1b0d7a6c3e8425, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FoursquareBall
+  networkBall: {fileID: 1443982760}
+--- !u!114 &1443982760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1443982751}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d3b91a27e45648f0a1c726354b8e90f1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkBallController
+  courtTargetManager: {fileID: 632038654}
+  ballRigidbody: {fileID: 1443982753}
+  handHitZone: {fileID: 1443982758}
+  physicalCollider: {fileID: 1443982755}
+  networkTransform: {fileID: 1443982761}
+  foursquareBall: {fileID: 0}
+  ballAudioSource: {fileID: 0}
+  ballHitClip: {fileID: 0}
+  ballBounceClip: {fileID: 0}
+  bounceCooldown: 0.12
+  minimumBounceSpeed: 0.5
+  ballSpawnPoint: {fileID: 0}
+  fallbackDropPosition: {x: -1.28, y: 2.03, z: 39.38}
+  autoResetYThreshold: -4
+  outOfBoundsRespawnDelay: 3
+  groundSettledDuration: 1
+  restLinearSpeedThreshold: 0.15
+  restAngularSpeedThreshold: 0.6
+  groundCheckTolerance: 0.08
+  arcApexHeight: 1.25
+  minimumFlightTime: 0.65
+  maximumFlightTime: 2.5
+  sourceSquare: 3
+  horizontalStrikeDirection: {x: 0, y: 0, z: 1}
+  swingSpeed: 2.5
+  directionTurnSpeed: 90
+  keyboardHandStrikeKey: 102
+  handHitRadius: 0.32
+  minimumHandSpeed: 1
+  minimumHandApproachSpeed: 0.2
+  hitCooldown: 0.25
+--- !u!114 &1443982761
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1443982751}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 158639473, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkTransform
+  _stateAuthorityChangeErrorCorrectionDelta: 0
+  SyncScale: 0
+  SyncParent: 0
+  _autoAOIOverride: 1
+  ConfigFlags: 0
+  PhysicsSettings:
+    ForecastEnabled: 1
+    DebugPhysics: 0
+    GravityForecast: 2
+    MaxExtrapolationTime: 0.15
+    MinLinearDetectedError: 0.02
+    MinAngularDetectedError: 3
+    DeadzoneVelocityMode: 0
+    MaxLinearError: 0
+    MaxAngularError: 0
+    LowCorrectionProgressThreshold: 0.015
+    HighErrorSimilarityThreshold: 1
+    MaxErrorTotalTime: 0.5
+    MaxRemoteSleepIgnoreTime: 0.5
+    ErrorCorrectionType: 0
+    LinearVelCorrectionMul: 1
+    AngularVelCorrectionMul: 1
+    PositionCorrectionLerp: 0.15
+    RotationCorrectionLerp: 0.15
+    Spring: 75
+    Damper: 2
+    MinImpactfulCollisionAlignment: 0.3
+    ImpactStartCorrectionTime: 0.1
+    ImpactCorrectionTimeComplete: 0.3
+--- !u!114 &1443982762
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1443982751}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1552182283, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.NetworkObject
+  SortKey: 2759284215
+  SendPriority: 1
+  EnableInterpolation: 1
+  Flags: 262402
+  NestedObjects: []
+  NetworkedBehaviours:
+  - {fileID: 1443982761}
+  - {fileID: 1443982760}
+  ForceRemoteRenderTimeframe: 0
 --- !u!43 &1447532573
 Mesh:
   m_ObjectHideFlags: 0
@@ -139272,7 +139389,7 @@ GameObject:
   - component: {fileID: 1475596678}
   - component: {fileID: 1475596677}
   m_Layer: 0
-  m_Name: Square_3
+  m_Name: Square_2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -139305,7 +139422,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ab7adc1ea30f4244a756ed7b197d207, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CourtSquare
-  squareID: 3
+  squareID: 2
 --- !u!64 &1475596678
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -151737,7 +151854,7 @@ GameObject:
   - component: {fileID: 1604830116}
   - component: {fileID: 1604830115}
   m_Layer: 0
-  m_Name: Square_1
+  m_Name: Square_4
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -151770,7 +151887,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ab7adc1ea30f4244a756ed7b197d207, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CourtSquare
-  squareID: 1
+  squareID: 4
 --- !u!64 &1604830116
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -152448,7 +152565,7 @@ GameObject:
   - component: {fileID: 1614564539}
   - component: {fileID: 1614564538}
   m_Layer: 0
-  m_Name: Square_2
+  m_Name: Square_3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -152481,7 +152598,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ab7adc1ea30f4244a756ed7b197d207, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CourtSquare
-  squareID: 2
+  squareID: 3
 --- !u!64 &1614564539
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -199806,4 +199923,3 @@ SceneRoots:
   - {fileID: 1442587744}
   - {fileID: 376492780}
   - {fileID: 1443982757}
-  - {fileID: 425026175}

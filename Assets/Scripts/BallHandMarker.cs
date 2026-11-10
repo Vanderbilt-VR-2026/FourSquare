@@ -6,17 +6,19 @@ public class BallHandMarker : MonoBehaviour
     [SerializeField, Min(0.01f)] private float visualCubeSize = 0.12f;
     [SerializeField] private Material visualMaterial;
     [SerializeField] private SquareRole playerRole = SquareRole.Spectator;
+    [SerializeField, Min(1f)] private float maximumTrackingSpeed = 8f;
 
     public SquareRole PlayerRole => playerRole;
     public Vector3 Velocity { get; private set; }
 
-    private Vector3 previousPosition;
     private Vector3 lastUpdatePosition;
     private float lastUpdateTime;
     private readonly Vector3[] recentVelocities = new Vector3[4];
     private int velocityIndex;
+    private int velocitySampleCount;
     private Renderer visualRenderer;
     private SphereCollider handCollider;
+    private bool trackingActive = true;
 
     public void SetPlayerRole(SquareRole role)
     {
@@ -44,7 +46,6 @@ public class BallHandMarker : MonoBehaviour
 
         handBody.isKinematic = true;
         handBody.useGravity = false;
-        previousPosition = transform.position;
         lastUpdatePosition = transform.position;
         lastUpdateTime = Time.time;
     }
@@ -91,6 +92,13 @@ public class BallHandMarker : MonoBehaviour
 
     public void SetTrackingActive(bool active)
     {
+        if (trackingActive != active)
+        {
+            trackingActive = active;
+            if (active)
+                ResetVelocityHistory();
+        }
+
         if (visualRenderer != null) visualRenderer.enabled = active && visualMaterial != null;
         if (handCollider != null) handCollider.enabled = active;
     }
@@ -98,36 +106,36 @@ public class BallHandMarker : MonoBehaviour
     private void Update()
     {
         float dt = Time.time - lastUpdateTime;
-        if (dt > 0.0001f)
-        {
-            Vector3 instantVelocity = (transform.position - lastUpdatePosition) / dt;
-            recentVelocities[velocityIndex] = instantVelocity;
-            velocityIndex = (velocityIndex + 1) % recentVelocities.Length;
+        if (dt <= 0.0001f)
+            return;
 
-            Vector3 sum = Vector3.zero;
-            for (int i = 0; i < recentVelocities.Length; i++)
-            {
-                sum += recentVelocities[i];
-            }
-            Velocity = sum / recentVelocities.Length;
-            lastUpdatePosition = transform.position;
-            lastUpdateTime = Time.time;
+        Vector3 instantVelocity = (transform.position - lastUpdatePosition) / dt;
+        lastUpdatePosition = transform.position;
+        lastUpdateTime = Time.time;
+
+        if (dt > 0.1f || instantVelocity.magnitude > maximumTrackingSpeed)
+        {
+            ResetVelocityHistory();
+            return;
         }
+
+        recentVelocities[velocityIndex] = instantVelocity;
+        velocityIndex = (velocityIndex + 1) % recentVelocities.Length;
+        velocitySampleCount = Mathf.Min(velocitySampleCount + 1, recentVelocities.Length);
+
+        Vector3 sum = Vector3.zero;
+        for (int i = 0; i < velocitySampleCount; i++)
+            sum += recentVelocities[i];
+        Velocity = sum / velocitySampleCount;
     }
 
-    private void FixedUpdate()
+    private void ResetVelocityHistory()
     {
-        float fixedDeltaTime = Time.fixedDeltaTime;
-        if (fixedDeltaTime > 0f)
-        {
-            Vector3 fixedVel = (transform.position - previousPosition) / fixedDeltaTime;
-            // Fallback if Update didn't run or if fixed velocity is higher during sudden impulse
-            if (fixedVel.sqrMagnitude > Velocity.sqrMagnitude)
-            {
-                Velocity = fixedVel;
-            }
-        }
-
-        previousPosition = transform.position;
+        System.Array.Clear(recentVelocities, 0, recentVelocities.Length);
+        velocityIndex = 0;
+        velocitySampleCount = 0;
+        Velocity = Vector3.zero;
+        lastUpdatePosition = transform.position;
+        lastUpdateTime = Time.time;
     }
 }

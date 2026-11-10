@@ -75,11 +75,12 @@ public static class FourSquareFusionSetup
         GameObject root = PrefabUtility.LoadPrefabContents(BallPrefabPath);
         try
         {
-            if (root.GetComponent<BallController>() == null)
+            if (root.GetComponent<NetworkBallController>() == null)
             {
-                throw new InvalidOperationException("Ball prefab needs a BallController on its root.");
+                throw new InvalidOperationException("Ball prefab needs a NetworkBallController on its root.");
             }
             if (root.GetComponent<NetworkObject>() == null) root.AddComponent<NetworkObject>();
+            if (root.GetComponent<FoursquareBall>() == null) root.AddComponent<FoursquareBall>();
 
             new NetworkObjectBaker().Bake(root);
             PrefabUtility.SaveAsPrefabAsset(root, BallPrefabPath);
@@ -123,6 +124,8 @@ public static class FourSquareFusionSetup
             serializedManager.FindProperty("ballSpawnPoint").objectReferenceValue = ballSpawnPoint;
             serializedManager.ApplyModifiedPropertiesWithoutUndo();
 
+            ConfigureCityRuntime(cityScene, managerObject, ballPrefab);
+
             FourSquareFusionSession session = managerObject.GetComponent<FourSquareFusionSession>();
             if (session == null) session = managerObject.AddComponent<FourSquareFusionSession>();
 
@@ -157,6 +160,128 @@ public static class FourSquareFusionSetup
             }
             if (openedScene) EditorSceneManager.CloseScene(cityScene, true);
         }
+    }
+
+    public static void ConfigureCityRuntime(Scene cityScene, GameObject managerObject, GameObject ballPrefab)
+    {
+        PlayerJoinCourt joinCourt = FindComponent<PlayerJoinCourt>(cityScene);
+        if (joinCourt == null)
+            throw new InvalidOperationException("City scene needs a PlayerJoinCourt component.");
+
+        SerializedObject serializedJoinCourt = new SerializedObject(joinCourt);
+        BoxCollider courtBounds =
+            serializedJoinCourt.FindProperty("courtBounds").objectReferenceValue as BoxCollider;
+        SerializedProperty spawnPoints = serializedJoinCourt.FindProperty("squareSpawnPoints");
+        if (courtBounds == null || spawnPoints.arraySize != FoursquareCourt.SquareCount)
+            throw new InvalidOperationException(
+                "PlayerJoinCourt needs court bounds and four spawn points ordered Square 1 through Square 4.");
+
+        Transform[] squareSpawnPoints = new Transform[FoursquareCourt.SquareCount];
+        for (int i = 0; i < squareSpawnPoints.Length; i++)
+        {
+            squareSpawnPoints[i] =
+                spawnPoints.GetArrayElementAtIndex(i).objectReferenceValue as Transform;
+            if (squareSpawnPoints[i] == null)
+                throw new InvalidOperationException($"PlayerJoinCourt is missing the Square {i + 1} spawn point.");
+        }
+
+        Transform boundaryTransform = FindTransform(cityScene, "Ball Out Of Bounds Bounds");
+        if (boundaryTransform == null)
+        {
+            GameObject boundaryObject = new GameObject("Ball Out Of Bounds Bounds");
+            boundaryTransform = boundaryObject.transform;
+            boundaryTransform.SetParent(courtBounds.transform.parent, false);
+        }
+
+        boundaryTransform.localPosition = courtBounds.transform.localPosition;
+        boundaryTransform.localRotation = courtBounds.transform.localRotation;
+        boundaryTransform.localScale = courtBounds.transform.localScale;
+        BoxCollider boundaryCollider = boundaryTransform.GetComponent<BoxCollider>();
+        if (boundaryCollider == null)
+            boundaryCollider = boundaryTransform.gameObject.AddComponent<BoxCollider>();
+        boundaryCollider.center = courtBounds.center;
+        boundaryCollider.size = new Vector3(courtBounds.size.x, 100f, courtBounds.size.z);
+        boundaryCollider.isTrigger = true;
+
+        FoursquareCourt court = boundaryTransform.GetComponent<FoursquareCourt>();
+        if (court == null)
+            court = boundaryTransform.gameObject.AddComponent<FoursquareCourt>();
+        SerializedObject serializedCourt = new SerializedObject(court);
+        serializedCourt.FindProperty("courtBounds").objectReferenceValue = courtBounds;
+        SerializedProperty serializedSpawns = serializedCourt.FindProperty("squareSpawnPoints");
+        serializedSpawns.arraySize = squareSpawnPoints.Length;
+        for (int i = 0; i < squareSpawnPoints.Length; i++)
+            serializedSpawns.GetArrayElementAtIndex(i).objectReferenceValue = squareSpawnPoints[i];
+        serializedCourt.FindProperty("kingServePoint").objectReferenceValue = null;
+        serializedCourt.ApplyModifiedPropertiesWithoutUndo();
+
+        FoursquareGameManager gameManager = managerObject.GetComponent<FoursquareGameManager>();
+        if (gameManager == null)
+            gameManager = managerObject.AddComponent<FoursquareGameManager>();
+
+        GameObject testBall = FindGameObject(cityScene, "Test Ball");
+        if (testBall == null)
+            throw new InvalidOperationException("City scene is missing the existing Test Ball GameObject.");
+
+        BallTrajectoryController trajectory = testBall.GetComponent<BallTrajectoryController>();
+        Vector3 fallbackPosition = trajectory != null
+            ? new SerializedObject(trajectory).FindProperty("initialDropPosition").vector3Value
+            : testBall.transform.position;
+        if (trajectory != null)
+            UnityEngine.Object.DestroyImmediate(trajectory, true);
+
+        BallController legacyController = testBall.GetComponent<BallController>();
+        if (legacyController != null)
+            UnityEngine.Object.DestroyImmediate(legacyController, true);
+
+        NetworkObject networkObject = testBall.GetComponent<NetworkObject>();
+        if (networkObject == null)
+            networkObject = testBall.AddComponent<NetworkObject>();
+        NetworkTransform networkTransform = testBall.GetComponent<NetworkTransform>();
+        if (networkTransform == null)
+            networkTransform = testBall.AddComponent<NetworkTransform>();
+        NetworkBallController networkBall = testBall.GetComponent<NetworkBallController>();
+        if (networkBall == null)
+            networkBall = testBall.AddComponent<NetworkBallController>();
+        FoursquareBall rules = testBall.GetComponent<FoursquareBall>();
+        if (rules == null)
+            rules = testBall.AddComponent<FoursquareBall>();
+
+        SerializedObject serializedNetworkBall = new SerializedObject(networkBall);
+        serializedNetworkBall.FindProperty("courtTargetManager").objectReferenceValue =
+            managerObject.GetComponent<CourtTargetManager>();
+        serializedNetworkBall.FindProperty("ballRigidbody").objectReferenceValue =
+            testBall.GetComponent<Rigidbody>();
+        serializedNetworkBall.FindProperty("networkTransform").objectReferenceValue = networkTransform;
+        serializedNetworkBall.FindProperty("fallbackDropPosition").vector3Value = fallbackPosition;
+        serializedNetworkBall.ApplyModifiedPropertiesWithoutUndo();
+
+        SerializedObject serializedRules = new SerializedObject(rules);
+        serializedRules.FindProperty("networkBall").objectReferenceValue = networkBall;
+        serializedRules.ApplyModifiedPropertiesWithoutUndo();
+
+        SerializedObject serializedGameManager = new SerializedObject(gameManager);
+        serializedGameManager.FindProperty("gameStateManager").objectReferenceValue =
+            managerObject.GetComponent<GameStateManager>();
+        serializedGameManager.FindProperty("court").objectReferenceValue = court;
+        serializedGameManager.FindProperty("ball").objectReferenceValue = rules;
+        serializedGameManager.FindProperty("networkBall").objectReferenceValue = networkBall;
+        serializedGameManager.ApplyModifiedPropertiesWithoutUndo();
+
+        new NetworkObjectBaker().Bake(testBall);
+        EditorSceneManager.MarkSceneDirty(cityScene);
+    }
+
+    private static T FindComponent<T>(Scene scene) where T : Component
+    {
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            T component = root.GetComponentInChildren<T>(true);
+            if (component != null)
+                return component;
+        }
+
+        return null;
     }
 
     private static Transform GetOrCreatePlayerSpawnPoint(Scene scene, Transform sessionTransform)
