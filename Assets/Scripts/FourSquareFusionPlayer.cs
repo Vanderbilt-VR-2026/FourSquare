@@ -29,6 +29,13 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [SerializeField] private bool logIkDiagnostics;
     [SerializeField] private float ikDiagnosticInterval = 0.25f;
 
+    [Header("Avatar Hand Rotation Offsets")]
+    [Tooltip("Local rotation offset applied to the avatar's left hand target relative to the XR controller rotation.")]
+    [SerializeField] private Vector3 leftHandRotationOffset = new Vector3(90f, 0f, 0f);
+
+    [Tooltip("Local rotation offset applied to the avatar's right hand target relative to the XR controller rotation.")]
+    [SerializeField] private Vector3 rightHandRotationOffset = new Vector3(90f, 0f, 0f);
+
     [Networked] public Vector3 NetworkRootPosition { get; set; }
     [Networked] public Quaternion NetworkRootRotation { get; set; }
     [Networked] public Vector3 NetworkHeadPosition { get; set; }
@@ -335,15 +342,26 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             NetworkHeadPosition = head.position;
             NetworkHeadRotation = head.rotation;
         }
-        if (leftHand != null)
+        if (ikLeftHandTarget != null)
+        {
+            NetworkLeftHandPosition = ikLeftHandTarget.position;
+            NetworkLeftHandRotation = ikLeftHandTarget.rotation;
+        }
+        else if (leftHand != null)
         {
             NetworkLeftHandPosition = leftHand.position;
-            NetworkLeftHandRotation = leftHand.rotation;
+            NetworkLeftHandRotation = leftHand.rotation * Quaternion.Euler(leftHandRotationOffset);
         }
-        if (rightHand != null)
+
+        if (ikRightHandTarget != null)
+        {
+            NetworkRightHandPosition = ikRightHandTarget.position;
+            NetworkRightHandRotation = ikRightHandTarget.rotation;
+        }
+        else if (rightHand != null)
         {
             NetworkRightHandPosition = rightHand.position;
-            NetworkRightHandRotation = rightHand.rotation;
+            NetworkRightHandRotation = rightHand.rotation * Quaternion.Euler(rightHandRotationOffset);
         }
     }
 
@@ -410,10 +428,16 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     private void ApplyLocalHandTargets()
     {
         if (leftHand != null && ikLeftHandTarget != null)
-            ikLeftHandTarget.SetPositionAndRotation(leftHand.position, leftHand.rotation);
+        {
+            Quaternion leftRot = leftHand.rotation * Quaternion.Euler(leftHandRotationOffset);
+            ikLeftHandTarget.SetPositionAndRotation(leftHand.position, leftRot);
+        }
 
         if (rightHand != null && ikRightHandTarget != null)
-            ikRightHandTarget.SetPositionAndRotation(rightHand.position, rightHand.rotation);
+        {
+            Quaternion rightRot = rightHand.rotation * Quaternion.Euler(rightHandRotationOffset);
+            ikRightHandTarget.SetPositionAndRotation(rightHand.position, rightRot);
+        }
     }
 
     private void ApplyRemoteHandTargets()

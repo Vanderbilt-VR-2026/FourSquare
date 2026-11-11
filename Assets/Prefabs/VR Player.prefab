@@ -143,6 +143,8 @@ MonoBehaviour:
   - {fileID: 1843576572510694420}
   logIkDiagnostics: 0
   ikDiagnosticInterval: 0.25
+  leftHandRotationOffset: {x: 90, y: 0, z: 0}
+  rightHandRotationOffset: {x: 90, y: 0, z: 0}
   _NetworkRootPosition: {x: 0, y: 0, z: 0}
   _NetworkRootRotation: {x: 0, y: 0, z: 0, w: 0}
   _NetworkHeadPosition: {x: 0, y: 0, z: 0}
