@@ -36,6 +36,10 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [Tooltip("Local rotation offset applied to the avatar's right hand target relative to the XR controller rotation.")]
     [SerializeField] private Vector3 rightHandRotationOffset = new Vector3(90f, 0f, 0f);
 
+    [Header("Floating Hands Settings")]
+    [Tooltip("If true, removes arm geometry to create clean floating hands with no wrist distortion.")]
+    [SerializeField] private bool useFloatingHands = true;
+
     [Networked] public Vector3 NetworkRootPosition { get; set; }
     [Networked] public Quaternion NetworkRootRotation { get; set; }
     [Networked] public Vector3 NetworkHeadPosition { get; set; }
@@ -86,6 +90,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     private bool hasSpeedParameter;
     private RigBuilder rigBuilder;
     private float nextIkDiagnosticTime;
+    private Transform leftHandBone;
+    private Transform rightHandBone;
+    private bool floatingMeshInitialized;
 
     private void Awake()
     {
@@ -105,6 +112,10 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         {
             if (mixamoAnimator == null) mixamoAnimator = stickmanTransform.GetComponent<Animator>();
             SetupIKConstraints();
+            if (useFloatingHands)
+            {
+                SetupFloatingHandsMesh();
+            }
         }
 
         if (leftHand == null) Debug.LogError("FourSquareFusionPlayer could not find the XR Left Hand transform.", this);
@@ -188,20 +199,22 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.LeftUpperArm) : null);
         Transform leftForeArm = FindChild(stickmanTransform, "mixamorig:LeftForeArm")
             ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.LeftLowerArm) : null);
-        Transform leftHandBone = FindChild(stickmanTransform, "mixamorig:LeftHand")
+        leftHandBone = FindChild(stickmanTransform, "mixamorig:LeftHand")
             ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.LeftHand) : null);
 
         Transform rightArm = FindChild(stickmanTransform, "mixamorig:RightArm")
             ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.RightUpperArm) : null);
         Transform rightForeArm = FindChild(stickmanTransform, "mixamorig:RightForeArm")
             ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.RightLowerArm) : null);
-        Transform rightHandBone = FindChild(stickmanTransform, "mixamorig:RightHand")
+        rightHandBone = FindChild(stickmanTransform, "mixamorig:RightHand")
             ?? (mixamoAnimator != null ? mixamoAnimator.GetBoneTransform(HumanBodyBones.RightHand) : null);
+
+        float ikWeight = useFloatingHands ? 0f : 1f;
 
         // Configure Left Hand IK
         TwoBoneIKConstraint leftConstraint = ikLeftHandTarget.GetComponent<TwoBoneIKConstraint>();
         if (leftConstraint == null) leftConstraint = ikLeftHandTarget.gameObject.AddComponent<TwoBoneIKConstraint>();
-        leftConstraint.weight = 1f;
+        leftConstraint.weight = ikWeight;
         if (leftArm != null) leftConstraint.data.root = leftArm;
         if (leftForeArm != null) leftConstraint.data.mid = leftForeArm;
         if (leftHandBone != null) leftConstraint.data.tip = leftHandBone;
@@ -212,7 +225,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         // Configure Right Hand IK
         TwoBoneIKConstraint rightConstraint = ikRightHandTarget.GetComponent<TwoBoneIKConstraint>();
         if (rightConstraint == null) rightConstraint = ikRightHandTarget.gameObject.AddComponent<TwoBoneIKConstraint>();
-        rightConstraint.weight = 1f;
+        rightConstraint.weight = ikWeight;
         if (rightArm != null) rightConstraint.data.root = rightArm;
         if (rightForeArm != null) rightConstraint.data.mid = rightForeArm;
         if (rightHandBone != null) rightConstraint.data.tip = rightHandBone;
@@ -420,6 +433,11 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void LateUpdate()
     {
+        if (useFloatingHands)
+        {
+            ApplyFloatingHandBones();
+        }
+
         if (Object == null || !Object.IsValid) return;
 
         LogIkDiagnostics();
@@ -447,6 +465,246 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         if (ikRightHandTarget != null && NetworkRightHandPosition != Vector3.zero)
             ikRightHandTarget.SetPositionAndRotation(NetworkRightHandPosition, NetworkRightHandRotation);
+    }
+
+    private void ApplyFloatingHandBones()
+    {
+        if (leftHandBone != null && ikLeftHandTarget != null)
+        {
+            leftHandBone.SetPositionAndRotation(ikLeftHandTarget.position, ikLeftHandTarget.rotation);
+        }
+
+        if (rightHandBone != null && ikRightHandTarget != null)
+        {
+            rightHandBone.SetPositionAndRotation(ikRightHandTarget.position, ikRightHandTarget.rotation);
+        }
+    }
+
+    private void SetupFloatingHandsMesh()
+    {
+        if (!useFloatingHands || stickmanTransform == null || floatingMeshInitialized) return;
+
+        SkinnedMeshRenderer bodySmr = null;
+        foreach (var smr in stickmanTransform.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            if (smr.gameObject.name.ToLowerInvariant().Contains("body") ||
+                (smr.sharedMesh != null && smr.sharedMesh.name.ToLowerInvariant().Contains("mesh.002")))
+            {
+                bodySmr = smr;
+                break;
+            }
+        }
+
+        if (bodySmr == null || bodySmr.sharedMesh == null)
+        {
+            return;
+        }
+
+        Mesh originalMesh = bodySmr.sharedMesh;
+        Mesh floatingMesh = Instantiate(originalMesh);
+        floatingMesh.name = originalMesh.name + "_FloatingHands";
+
+        Transform[] bones = bodySmr.bones;
+        int boneCount = bones != null ? bones.Length : 0;
+        if (boneCount == 0) return;
+
+        // Bone categories: 0 = Body, 1 = Left Arm, 2 = Right Arm, 3 = Left Hand, 4 = Right Hand
+        int[] boneCategory = new int[boneCount];
+        int leftHandIndex = -1;
+        int rightHandIndex = -1;
+        int leftShoulderIndex = -1;
+        int rightShoulderIndex = -1;
+
+        for (int i = 0; i < boneCount; i++)
+        {
+            if (bones[i] == null) continue;
+            string bName = bones[i].name;
+
+            if (bName.Contains("LeftHand"))
+            {
+                boneCategory[i] = 3;
+                if (bName == "mixamorig:LeftHand" || bName.EndsWith(":LeftHand") || bName == "LeftHand")
+                    leftHandIndex = i;
+            }
+            else if (bName.Contains("RightHand"))
+            {
+                boneCategory[i] = 4;
+                if (bName == "mixamorig:RightHand" || bName.EndsWith(":RightHand") || bName == "RightHand")
+                    rightHandIndex = i;
+            }
+            else if (bName.Contains("LeftArm") || bName.Contains("LeftForeArm"))
+            {
+                boneCategory[i] = 1;
+            }
+            else if (bName.Contains("RightArm") || bName.Contains("RightForeArm"))
+            {
+                boneCategory[i] = 2;
+            }
+            else
+            {
+                boneCategory[i] = 0;
+                if (bName.Contains("LeftShoulder")) leftShoulderIndex = i;
+                else if (bName.Contains("RightShoulder")) rightShoulderIndex = i;
+            }
+        }
+
+        BoneWeight[] weights = floatingMesh.boneWeights;
+        int vertexCount = floatingMesh.vertexCount;
+        int[] vertexCategory = new int[vertexCount]; // 0 = Body, 1 = Arm, 2 = Hand
+
+        for (int v = 0; v < vertexCount; v++)
+        {
+            BoneWeight bw = weights[v];
+            float armWeight = 0f;
+            float handWeight = 0f;
+            float bodyWeight = 0f;
+
+            AccumulateWeightCategory(bw.boneIndex0, bw.weight0, boneCategory, ref armWeight, ref handWeight, ref bodyWeight);
+            AccumulateWeightCategory(bw.boneIndex1, bw.weight1, boneCategory, ref armWeight, ref handWeight, ref bodyWeight);
+            AccumulateWeightCategory(bw.boneIndex2, bw.weight2, boneCategory, ref armWeight, ref handWeight, ref bodyWeight);
+            AccumulateWeightCategory(bw.boneIndex3, bw.weight3, boneCategory, ref armWeight, ref handWeight, ref bodyWeight);
+
+            if (handWeight > armWeight)
+            {
+                vertexCategory[v] = 2; // Hand
+                CleanHandBoneWeight(ref bw, boneCategory, leftHandIndex, rightHandIndex);
+                weights[v] = bw;
+            }
+            else if (bodyWeight > armWeight)
+            {
+                vertexCategory[v] = 0; // Body
+                CleanBodyBoneWeight(ref bw, boneCategory, leftShoulderIndex, rightShoulderIndex);
+                weights[v] = bw;
+            }
+            else
+            {
+                vertexCategory[v] = 1; // Arm
+            }
+        }
+
+        int subMeshCount = floatingMesh.subMeshCount;
+        for (int s = 0; s < subMeshCount; s++)
+        {
+            int[] triangles = floatingMesh.GetTriangles(s);
+            List<int> cleanTriangles = new List<int>(triangles.Length);
+
+            for (int i = 0; i < triangles.Length; i += 3)
+            {
+                int t0 = triangles[i];
+                int t1 = triangles[i + 1];
+                int t2 = triangles[i + 2];
+
+                int c0 = vertexCategory[t0];
+                int c1 = vertexCategory[t1];
+                int c2 = vertexCategory[t2];
+
+                // Exclude any triangle with arm vertices
+                if (c0 == 1 || c1 == 1 || c2 == 1) continue;
+
+                // Only keep triangle if all vertices belong to the same category (all Hand or all Body)
+                if (c0 == c1 && c1 == c2)
+                {
+                    cleanTriangles.Add(t0);
+                    cleanTriangles.Add(t1);
+                    cleanTriangles.Add(t2);
+                }
+            }
+
+            floatingMesh.SetTriangles(cleanTriangles.ToArray(), s);
+        }
+
+        floatingMesh.boneWeights = weights;
+        floatingMesh.RecalculateBounds();
+
+        bodySmr.updateWhenOffscreen = true;
+        bodySmr.sharedMesh = floatingMesh;
+        floatingMeshInitialized = true;
+    }
+
+    private static void AccumulateWeightCategory(int boneIndex, float weight, int[] boneCategory, ref float armWeight, ref float handWeight, ref float bodyWeight)
+    {
+        if (weight <= 0f || boneIndex < 0 || boneIndex >= boneCategory.Length) return;
+
+        int cat = boneCategory[boneIndex];
+        if (cat == 1 || cat == 2) armWeight += weight;
+        else if (cat == 3 || cat == 4) handWeight += weight;
+        else bodyWeight += weight;
+    }
+
+    private static void CleanHandBoneWeight(ref BoneWeight bw, int[] boneCategory, int fallbackLeftHand, int fallbackRightHand)
+    {
+        bool isLeft = false;
+        bool isRight = false;
+        CheckHandSide(bw.boneIndex0, boneCategory, ref isLeft, ref isRight);
+        CheckHandSide(bw.boneIndex1, boneCategory, ref isLeft, ref isRight);
+        CheckHandSide(bw.boneIndex2, boneCategory, ref isLeft, ref isRight);
+        CheckHandSide(bw.boneIndex3, boneCategory, ref isLeft, ref isRight);
+
+        // Zero out arm influences
+        if (IsArmBone(bw.boneIndex0, boneCategory)) bw.weight0 = 0f;
+        if (IsArmBone(bw.boneIndex1, boneCategory)) bw.weight1 = 0f;
+        if (IsArmBone(bw.boneIndex2, boneCategory)) bw.weight2 = 0f;
+        if (IsArmBone(bw.boneIndex3, boneCategory)) bw.weight3 = 0f;
+
+        float total = bw.weight0 + bw.weight1 + bw.weight2 + bw.weight3;
+        if (total > 0.0001f)
+        {
+            float inv = 1f / total;
+            bw.weight0 *= inv;
+            bw.weight1 *= inv;
+            bw.weight2 *= inv;
+            bw.weight3 *= inv;
+        }
+        else
+        {
+            int fallback = isRight ? fallbackRightHand : fallbackLeftHand;
+            if (fallback < 0) fallback = fallbackLeftHand >= 0 ? fallbackLeftHand : fallbackRightHand;
+            if (fallback >= 0)
+            {
+                bw.boneIndex0 = fallback;
+                bw.weight0 = 1f;
+            }
+        }
+    }
+
+    private static void CleanBodyBoneWeight(ref BoneWeight bw, int[] boneCategory, int fallbackLeftShoulder, int fallbackRightShoulder)
+    {
+        // Zero out arm influences
+        if (IsArmBone(bw.boneIndex0, boneCategory)) bw.weight0 = 0f;
+        if (IsArmBone(bw.boneIndex1, boneCategory)) bw.weight1 = 0f;
+        if (IsArmBone(bw.boneIndex2, boneCategory)) bw.weight2 = 0f;
+        if (IsArmBone(bw.boneIndex3, boneCategory)) bw.weight3 = 0f;
+
+        float total = bw.weight0 + bw.weight1 + bw.weight2 + bw.weight3;
+        if (total > 0.0001f)
+        {
+            float inv = 1f / total;
+            bw.weight0 *= inv;
+            bw.weight1 *= inv;
+            bw.weight2 *= inv;
+            bw.weight3 *= inv;
+        }
+        else
+        {
+            int fallback = fallbackLeftShoulder >= 0 ? fallbackLeftShoulder : (fallbackRightShoulder >= 0 ? fallbackRightShoulder : 0);
+            bw.boneIndex0 = fallback;
+            bw.weight0 = 1f;
+        }
+    }
+
+    private static void CheckHandSide(int boneIndex, int[] boneCategory, ref bool isLeft, ref bool isRight)
+    {
+        if (boneIndex < 0 || boneIndex >= boneCategory.Length) return;
+        int cat = boneCategory[boneIndex];
+        if (cat == 3) isLeft = true;
+        else if (cat == 4) isRight = true;
+    }
+
+    private static bool IsArmBone(int boneIndex, int[] boneCategory)
+    {
+        if (boneIndex < 0 || boneIndex >= boneCategory.Length) return false;
+        int cat = boneCategory[boneIndex];
+        return cat == 1 || cat == 2;
     }
 
     private void EnsureRigBuilt()
