@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Fusion;
 using Fusion.Sockets;
+using Photon.Voice.Fusion;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 #if UNITY_EDITOR
@@ -128,7 +129,28 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
             runner = runnerObject.AddComponent<NetworkRunner>();
             runner.ProvideInput = true;
             runner.AddCallbacks(this);
+            // Photon Voice integration.
+            // Attach voice to the same GameObject as NetworkRunner
+            // before starting the Fusion multiplayer session.
+            // Photon Voice integration
+            FusionVoiceClient voiceClient =
+                runnerObject.AddComponent<FusionVoiceClient>();
+            
+            voiceClient.UseFusionAppSettings = true;
 
+            // Register Photon Voice for Fusion callbacks.
+            // Prevent duplicate registration if the component
+            // is already registered elsewhere.
+            runner.RemoveCallbacks(voiceClient);
+            runner.AddCallbacks(voiceClient);
+            
+            Debug.Log(
+                "[FourSquare Voice] FusionVoiceClient registered. " +
+                "with NetworkRunner callbacks.",
+                voiceClient
+            );
+
+            // Existing Fusion scene and object management
             INetworkSceneManager sceneManager =
                 runnerObject.AddComponent<NetworkSceneManagerDefault>();
             INetworkObjectProvider objectProvider =
