@@ -76074,6 +76074,7 @@ MonoBehaviour:
   maximumPlayers: 4
   requiredPlayersCount: 2
   cityScenePath: Assets/Scenes/City.unity
+  endScenePath: Assets/Scenes/EndScene.unity
   disableXRInEditor: 0
 --- !u!1 &2003131890
 GameObject:
