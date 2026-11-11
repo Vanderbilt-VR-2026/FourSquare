@@ -50,6 +50,15 @@ public static class FourSquareFusionSetup
             serializedPlayer.FindProperty("head").objectReferenceValue = origin.Camera != null ? origin.Camera.transform : null;
             serializedPlayer.FindProperty("leftHand").objectReferenceValue = leftHand;
             serializedPlayer.FindProperty("rightHand").objectReferenceValue = rightHand;
+            RoomCodeOverlayUI playerOverlay = root.GetComponentInChildren<RoomCodeOverlayUI>(true);
+            serializedPlayer.FindProperty("playerOverlay").objectReferenceValue = playerOverlay;
+            PlayerNameTag playerNameTag = root.GetComponent<PlayerNameTag>();
+            if (playerNameTag == null) playerNameTag = root.AddComponent<PlayerNameTag>();
+            SerializedObject serializedNameTag = new SerializedObject(playerNameTag);
+            GameObject playerNameTagPrefab =
+                AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player Name Tag.prefab");
+            serializedNameTag.FindProperty("tagPrefab").objectReferenceValue = playerNameTagPrefab;
+            serializedNameTag.ApplyModifiedPropertiesWithoutUndo();
             SerializedProperty renderers = serializedPlayer.FindProperty("avatarRenderers");
             renderers.arraySize = root.GetComponentsInChildren<Renderer>(true).Length;
             Renderer[] childRenderers = root.GetComponentsInChildren<Renderer>(true);

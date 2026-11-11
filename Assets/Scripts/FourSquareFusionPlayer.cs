@@ -13,6 +13,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [SerializeField] private Transform head;
     [SerializeField] private Transform leftHand;
     [SerializeField] private Transform rightHand;
+    [SerializeField] private RoomCodeOverlayUI playerOverlay;
 
     [Header("Remote Rig")]
     [SerializeField] private Renderer[] avatarRenderers;
@@ -89,6 +90,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         rigCamera = head != null ? head.GetComponent<Camera>() : GetComponentInChildren<Camera>(true);
         handMarkers = GetComponentsInChildren<BallHandMarker>(true);
+        if (GetComponent<PlayerNameTag>() == null)
+            gameObject.AddComponent<PlayerNameTag>();
     }
 
     private void CreateSquareHead()
@@ -146,6 +149,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
 
         ConfigureRigForAuthority();
+        AttachPlayerOverlay();
         GameStateManager.Instance?.RegisterNetworkPlayer(this);
     }
 
@@ -260,6 +264,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         bool isLocal = HasLocalAuthority;
         if (rigCamera != null) rigCamera.enabled = isLocal;
+        if (playerOverlay != null) playerOverlay.SetVisible(isLocal);
 
         foreach (AudioListener listener in GetComponentsInChildren<AudioListener>(true))
         {
@@ -268,7 +273,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         foreach (UnityEngine.Behaviour behaviour in GetComponentsInChildren<UnityEngine.Behaviour>(true))
         {
-            if (behaviour == this || behaviour is XROrigin || behaviour is Camera || behaviour is AudioListener)
+            if (behaviour == this || behaviour is PlayerNameTag
+                || behaviour.GetComponentInParent<PlayerNameTag>() != null
+                || behaviour is XROrigin || behaviour is Camera || behaviour is AudioListener)
             {
                 continue;
             }
@@ -301,6 +308,14 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         {
             squareHeadRenderer.enabled = !isLocal;
         }
+    }
+
+    private void AttachPlayerOverlay()
+    {
+        if (!HasLocalAuthority || head == null) return;
+
+        if (playerOverlay != null)
+            playerOverlay.AttachToHead(head);
     }
 
     private void Update()
