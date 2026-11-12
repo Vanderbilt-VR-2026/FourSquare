@@ -134,6 +134,7 @@ MonoBehaviour:
   - {fileID: 4297574636729099772}
   - {fileID: 3697404328519084993}
   showLocalAvatar: 0
+  headVisualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   _NetworkRootPosition: {x: 0, y: 0, z: 0}
   _NetworkRootRotation: {x: 0, y: 0, z: 0, w: 0}
   _NetworkHeadPosition: {x: 0, y: 0, z: 0}
@@ -281,7 +282,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
   visualCubeSize: 0.12
-  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  handVisualPrefab: {fileID: 0}
+  visualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   playerRole: 0
 --- !u!1 &1324493728189623182
 GameObject:
@@ -495,7 +497,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
   visualCubeSize: 0.12
-  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  handVisualPrefab: {fileID: 0}
+  visualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   playerRole: 0
 --- !u!1 &2564747234580309914
 GameObject:
