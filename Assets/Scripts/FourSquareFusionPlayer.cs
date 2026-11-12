@@ -20,6 +20,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [Header("Remote Rig")]
     [SerializeField] private Renderer[] avatarRenderers;
     [SerializeField] private bool showLocalAvatar;
+    [SerializeField] private Material headVisualMaterial;
 
     [Header("Mixamo Avatar & IK Setup")]
     [SerializeField] private Transform stickmanTransform;
@@ -52,17 +53,18 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [Networked] public bool NetworkHasXRTracking { get; set; }
     [Networked] public int NetworkRole { get; set; }
 
-    public bool IsLocallyOwned => Object != null && Object.IsValid && Object.HasInputAuthority;
+    public bool IsLocallyOwned => HasLocalAuthority;
+    public bool HasPlayerAuthority => PlayerAuthority != PlayerRef.None;
     public bool HasPlayerInputAuthority =>
         Object != null && Object.IsValid && Object.InputAuthority != PlayerRef.None;
     public bool IsLocalCameraReady =>
         Object != null
         && Object.IsValid
-        && Object.HasInputAuthority
+        && HasLocalAuthority
         && rigCamera != null
         && rigCamera.isActiveAndEnabled;
     public Transform HeadTransform => head;
-    public int JoinOrder => Object != null && Object.IsValid ? Object.InputAuthority.PlayerId : int.MaxValue;
+    public int JoinOrder => HasPlayerAuthority ? PlayerAuthority.PlayerId : int.MaxValue;
     public int ConnectedPlayerCount
     {
         get
@@ -77,9 +79,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     public SquareRole PlayerRole => System.Enum.IsDefined(typeof(SquareRole), NetworkRole)
         ? (SquareRole)NetworkRole
         : SquareRole.Spectator;
-    public string PlayerId => Object != null && Object.IsValid ? Object.InputAuthority.ToString() : string.Empty;
+    public string PlayerId => HasPlayerAuthority ? PlayerAuthority.ToString() : string.Empty;
     public string DisplayName => Object != null && Object.IsValid
-        ? $"Player {Object.InputAuthority.PlayerId}"
+        ? $"Player {PlayerAuthority.PlayerId}"
         : "Unknown Player";
 
     private BallHandMarker[] handMarkers;
@@ -87,6 +89,17 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     private Renderer squareHeadRenderer;
     private Material squareHeadMaterial;
     private int lastAppliedRole = int.MinValue;
+    private bool HasLocalAuthority =>
+        Object != null
+        && Object.IsValid
+        && (Object.HasInputAuthority
+            || (Runner != null && Runner.GameMode == GameMode.Shared && Object.HasStateAuthority));
+    private PlayerRef PlayerAuthority =>
+        Object == null || !Object.IsValid
+            ? PlayerRef.None
+            : Runner != null && Runner.GameMode == GameMode.Shared
+                ? Object.StateAuthority
+                : Object.InputAuthority;
     private Vector3 lastRootPosition;
     private bool hasSpeedParameter;
     private RigBuilder rigBuilder;
@@ -290,30 +303,39 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         squareHeadRenderer = headObject.GetComponent<Renderer>();
         squareHeadRenderer.enabled = false;
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Unlit/Color");
-        if (shader == null) shader = Shader.Find("Standard");
-        if (shader == null)
+        if (headVisualMaterial != null
+            && headVisualMaterial.shader != null
+            && headVisualMaterial.shader.isSupported)
         {
-            Debug.LogError("Could not find a shader for the placeholder square head.", this);
-            return;
+            squareHeadRenderer.sharedMaterial = headVisualMaterial;
         }
-
-        squareHeadMaterial = new Material(shader)
+        else
         {
-            color = new Color(0.95f, 0.75f, 0.35f, 1f)
-        };
-        squareHeadRenderer.sharedMaterial = squareHeadMaterial;
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            if (shader == null) shader = Shader.Find("Standard");
+            if (shader == null)
+            {
+                Debug.LogError("Could not find a shader for the placeholder square head.", this);
+                return;
+            }
+
+            squareHeadMaterial = new Material(shader)
+            {
+                color = new Color(0.95f, 0.75f, 0.35f, 1f)
+            };
+            squareHeadRenderer.sharedMaterial = squareHeadMaterial;
+        }
     }
 
     public override void Spawned()
     {
         EnsureRigBuilt();
 
-        if (!HasPlayerInputAuthority)
+        if (!HasPlayerAuthority)
         {
             Debug.LogWarning(
-                "FourSquareFusionPlayer has no input authority. It will remain a non-controllable network proxy. " +
+                "FourSquareFusionPlayer has no player authority. It will remain a non-controllable network proxy. " +
                 "Ensure this object is spawned from the VR Player prefab and is not placed directly in a scene.",
                 this);
             ConfigureRigForAuthority();
@@ -342,7 +364,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     public override void FixedUpdateNetwork()
     {
-        if (!Object.HasInputAuthority) return;
+        if (!HasLocalAuthority) return;
 
         CaptureLocalPose();
     }
@@ -389,7 +411,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         UpdateHandRoles();
 
-        bool isLocal = Object.HasInputAuthority;
+        bool isLocal = HasLocalAuthority;
         if (squareHeadRenderer != null)
         {
             squareHeadRenderer.enabled = !isLocal;
@@ -1149,7 +1171,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void ApplyRoleToLocalRig(SquareRole role)
     {
-        if (Object != null && Object.IsValid && Object.HasInputAuthority && xrOrigin != null)
+        if (HasLocalAuthority && xrOrigin != null)
         {
             PlayerJoinCourt.MoveJoinedPlayerToRole(xrOrigin, role);
         }
@@ -1159,7 +1181,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         bool isFusionRunning = Runner != null && Runner.IsRunning;
         bool isLocal = isFusionRunning
-            ? (Object != null && Object.IsValid && Object.HasInputAuthority)
+            ? HasLocalAuthority
             : (Object == null || !Object.IsValid || Object.HasInputAuthority);
         if (rigCamera != null) rigCamera.enabled = isLocal;
 
@@ -1229,7 +1251,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         bool isFusionRunning = Runner != null && Runner.IsRunning;
         bool isLocal = isFusionRunning
-            ? (Object != null && Object.IsValid && Object.HasInputAuthority)
+            ? HasLocalAuthority
             : (Object == null || !Object.IsValid || Object.HasInputAuthority);
 
         if (isLocal)
@@ -1284,9 +1306,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         if (simulator != null && simulator.isActiveAndEnabled)
             return true;
 
-        return true;
+        return false;
 #else
-        return true;
+        return false;
 #endif
     }
 
