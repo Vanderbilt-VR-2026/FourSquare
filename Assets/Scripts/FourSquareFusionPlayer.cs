@@ -592,6 +592,12 @@ public class FourSquareFusionPlayer : NetworkBehaviour
                 }
             }
 
+            Vector3[] origVertices = originalMesh.vertices;
+            HashSet<int> leftWristIndices = new HashSet<int>();
+            HashSet<int> rightWristIndices = new HashSet<int>();
+            HashSet<int> leftShoulderIndices = new HashSet<int>();
+            HashSet<int> rightShoulderIndices = new HashSet<int>();
+
             int subMeshCount = floatingMesh.subMeshCount;
             for (int s = 0; s < subMeshCount; s++)
             {
@@ -609,7 +615,26 @@ public class FourSquareFusionPlayer : NetworkBehaviour
                     int c2 = vertexCategory[t2];
 
                     // Exclude any triangle with arm vertices
-                    if (c0 == 1 || c1 == 1 || c2 == 1) continue;
+                    if (c0 == 1 || c1 == 1 || c2 == 1)
+                    {
+                        // Collect boundary vertices for cap placement
+                        bool hasHand = c0 == 2 || c1 == 2 || c2 == 2;
+                        bool hasBody = c0 == 0 || c1 == 0 || c2 == 0;
+
+                        if (hasHand)
+                        {
+                            CollectBoundaryHandVertex(t0, c0, weights, boneCategory, leftWristIndices, rightWristIndices);
+                            CollectBoundaryHandVertex(t1, c1, weights, boneCategory, leftWristIndices, rightWristIndices);
+                            CollectBoundaryHandVertex(t2, c2, weights, boneCategory, leftWristIndices, rightWristIndices);
+                        }
+                        else if (hasBody)
+                        {
+                            CollectBoundaryBodyVertex(t0, c0, t0, t1, t2, weights, boneCategory, leftShoulderIndices, rightShoulderIndices, origVertices);
+                            CollectBoundaryBodyVertex(t1, c1, t0, t1, t2, weights, boneCategory, leftShoulderIndices, rightShoulderIndices, origVertices);
+                            CollectBoundaryBodyVertex(t2, c2, t0, t1, t2, weights, boneCategory, leftShoulderIndices, rightShoulderIndices, origVertices);
+                        }
+                        continue;
+                    }
 
                     // Only keep triangle if all vertices belong to the same category (all Hand or all Body)
                     if (c0 == c1 && c1 == c2)
@@ -629,11 +654,292 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             bodySmr.updateWhenOffscreen = true;
             bodySmr.sharedMesh = floatingMesh;
             floatingMeshInitialized = true;
+
+            CreateVisualCaps(bodySmr, originalMesh, origVertices,
+                leftWristIndices, rightWristIndices, leftShoulderIndices, rightShoulderIndices,
+                leftHandIndex, rightHandIndex, leftShoulderIndex, rightShoulderIndex);
         }
         catch (System.Exception ex)
         {
             Debug.LogError($"FourSquareFusionPlayer: Failed to generate floating hands mesh ({ex.Message}). Preserving default mesh.", this);
         }
+    }
+
+    private void CreateVisualCaps(
+        SkinnedMeshRenderer bodySmr,
+        Mesh originalMesh,
+        Vector3[] origVertices,
+        HashSet<int> leftWristIndices,
+        HashSet<int> rightWristIndices,
+        HashSet<int> leftShoulderIndices,
+        HashSet<int> rightShoulderIndices,
+        int leftHandIndex,
+        int rightHandIndex,
+        int leftShoulderIndex,
+        int rightShoulderIndex)
+    {
+        Material capMaterial = bodySmr.sharedMaterial;
+        int capLayer = stickmanTransform.gameObject.layer;
+        Matrix4x4[] bindposes = originalMesh.bindposes;
+
+        List<Renderer> newRenderers = new List<Renderer>();
+        if (avatarRenderers != null)
+        {
+            newRenderers.AddRange(avatarRenderers);
+        }
+
+        // 1. Left Wrist Cap (attached to leftHandBone)
+        if (leftHandBone != null)
+        {
+            Matrix4x4 bindPose = (leftHandIndex >= 0 && bindposes != null && leftHandIndex < bindposes.Length)
+                ? bindposes[leftHandIndex] : Matrix4x4.identity;
+            ComputeOpeningBounds(leftWristIndices, origVertices, bindPose, out Vector3 centroid, out Vector3 extents);
+            GameObject cap = CreateCapObject("LeftWristCap", leftHandBone, centroid, extents, capMaterial, capLayer);
+            if (cap != null) newRenderers.Add(cap.GetComponent<Renderer>());
+        }
+
+        // 2. Right Wrist Cap (attached to rightHandBone)
+        if (rightHandBone != null)
+        {
+            Matrix4x4 bindPose = (rightHandIndex >= 0 && bindposes != null && rightHandIndex < bindposes.Length)
+                ? bindposes[rightHandIndex] : Matrix4x4.identity;
+            ComputeOpeningBounds(rightWristIndices, origVertices, bindPose, out Vector3 centroid, out Vector3 extents);
+            GameObject cap = CreateCapObject("RightWristCap", rightHandBone, centroid, extents, capMaterial, capLayer);
+            if (cap != null) newRenderers.Add(cap.GetComponent<Renderer>());
+        }
+
+        // 3. Left Shoulder Cap (attached to leftShoulderBone)
+        Transform leftShoulderBone = FindChild(stickmanTransform, "mixamorig:LeftShoulder")
+            ?? FindChild(stickmanTransform, "LeftShoulder");
+        if (leftShoulderBone != null)
+        {
+            Matrix4x4 bindPose = (leftShoulderIndex >= 0 && bindposes != null && leftShoulderIndex < bindposes.Length)
+                ? bindposes[leftShoulderIndex] : Matrix4x4.identity;
+            ComputeOpeningBounds(leftShoulderIndices, origVertices, bindPose, out Vector3 centroid, out Vector3 extents);
+            GameObject cap = CreateCapObject("LeftShoulderCap", leftShoulderBone, centroid, extents, capMaterial, capLayer);
+            if (cap != null) newRenderers.Add(cap.GetComponent<Renderer>());
+        }
+
+        // 4. Right Shoulder Cap (attached to rightShoulderBone)
+        Transform rightShoulderBone = FindChild(stickmanTransform, "mixamorig:RightShoulder")
+            ?? FindChild(stickmanTransform, "RightShoulder");
+        if (rightShoulderBone != null)
+        {
+            Matrix4x4 bindPose = (rightShoulderIndex >= 0 && bindposes != null && rightShoulderIndex < bindposes.Length)
+                ? bindposes[rightShoulderIndex] : Matrix4x4.identity;
+            ComputeOpeningBounds(rightShoulderIndices, origVertices, bindPose, out Vector3 centroid, out Vector3 extents);
+            GameObject cap = CreateCapObject("RightShoulderCap", rightShoulderBone, centroid, extents, capMaterial, capLayer);
+            if (cap != null) newRenderers.Add(cap.GetComponent<Renderer>());
+        }
+
+        avatarRenderers = newRenderers.ToArray();
+    }
+
+    private static GameObject CreateCapObject(
+        string name,
+        Transform parentBone,
+        Vector3 localPosition,
+        Vector3 extents,
+        Material material,
+        int layer)
+    {
+        if (parentBone == null) return null;
+
+        GameObject capObj = new GameObject(name);
+        capObj.transform.SetParent(parentBone, false);
+        capObj.transform.localPosition = localPosition;
+        capObj.transform.localRotation = Quaternion.identity;
+        capObj.transform.localScale = Vector3.one;
+        capObj.layer = layer;
+
+        MeshFilter mf = capObj.AddComponent<MeshFilter>();
+        mf.sharedMesh = GenerateEllipsoidMesh(extents.x, extents.y, extents.z);
+
+        MeshRenderer mr = capObj.AddComponent<MeshRenderer>();
+        mr.sharedMaterial = material;
+
+        return capObj;
+    }
+
+    private static Mesh GenerateEllipsoidMesh(float rx, float ry, float rz, int latSegments = 8, int lonSegments = 12)
+    {
+        Mesh mesh = new Mesh();
+        mesh.name = "CapMesh";
+
+        int vertCount = (latSegments + 1) * (lonSegments + 1);
+        Vector3[] vertices = new Vector3[vertCount];
+        Vector3[] normals = new Vector3[vertCount];
+        Vector2[] uvs = new Vector2[vertCount];
+        List<int> triangles = new List<int>(latSegments * lonSegments * 12);
+
+        float invLat = 1f / latSegments;
+        float invLon = 1f / lonSegments;
+
+        int vi = 0;
+        for (int lat = 0; lat <= latSegments; lat++)
+        {
+            float theta = lat * Mathf.PI * invLat;
+            float sinTheta = Mathf.Sin(theta);
+            float cosTheta = Mathf.Cos(theta);
+
+            for (int lon = 0; lon <= lonSegments; lon++)
+            {
+                float phi = lon * 2f * Mathf.PI * invLon;
+                float sinPhi = Mathf.Sin(phi);
+                float cosPhi = Mathf.Cos(phi);
+
+                float x = rx * sinTheta * cosPhi;
+                float y = ry * cosTheta;
+                float z = rz * sinTheta * sinPhi;
+
+                vertices[vi] = new Vector3(x, y, z);
+
+                Vector3 normal = new Vector3(
+                    rx > 0.0001f ? x / (rx * rx) : 0f,
+                    ry > 0.0001f ? y / (ry * ry) : 0f,
+                    rz > 0.0001f ? z / (rz * rz) : 0f).normalized;
+                normals[vi] = normal;
+
+                uvs[vi] = new Vector2(lon * invLon, lat * invLat);
+                vi++;
+            }
+        }
+
+        for (int lat = 0; lat < latSegments; lat++)
+        {
+            for (int lon = 0; lon < lonSegments; lon++)
+            {
+                int current = lat * (lonSegments + 1) + lon;
+                int next = current + lonSegments + 1;
+
+                // Outward-facing front triangles
+                triangles.Add(current);
+                triangles.Add(current + 1);
+                triangles.Add(next);
+
+                triangles.Add(next);
+                triangles.Add(current + 1);
+                triangles.Add(next + 1);
+
+                // Inward-facing back triangles (double-sided so interior is never empty)
+                triangles.Add(current);
+                triangles.Add(next);
+                triangles.Add(current + 1);
+
+                triangles.Add(next);
+                triangles.Add(next + 1);
+                triangles.Add(current + 1);
+            }
+        }
+
+        mesh.vertices = vertices;
+        mesh.normals = normals;
+        mesh.uv = uvs;
+        mesh.triangles = triangles.ToArray();
+        mesh.RecalculateBounds();
+
+        return mesh;
+    }
+
+    private static void ComputeOpeningBounds(
+        HashSet<int> vertIndices,
+        Vector3[] vertices,
+        Matrix4x4 bindPose,
+        out Vector3 localCentroid,
+        out Vector3 extents)
+    {
+        if (vertIndices == null || vertIndices.Count == 0)
+        {
+            localCentroid = Vector3.zero;
+            extents = new Vector3(0.045f, 0.045f, 0.045f);
+            return;
+        }
+
+        Vector3 sum = Vector3.zero;
+        Vector3 min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+        Vector3 max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+
+        foreach (int v in vertIndices)
+        {
+            Vector3 boneLocal = bindPose.MultiplyPoint3x4(vertices[v]);
+            sum += boneLocal;
+            min = Vector3.Min(min, boneLocal);
+            max = Vector3.Max(max, boneLocal);
+        }
+
+        localCentroid = sum / vertIndices.Count;
+        Vector3 size = (max - min) * 0.5f;
+
+        float minThickness = 0.02f;
+        float rx = Mathf.Max(minThickness, size.x * 1.20f);
+        float ry = Mathf.Max(minThickness, size.y * 1.20f);
+        float rz = Mathf.Max(minThickness, size.z * 1.20f);
+        extents = new Vector3(rx, ry, rz);
+    }
+
+    private static void CollectBoundaryHandVertex(
+        int vertIndex,
+        int cat,
+        BoneWeight[] weights,
+        int[] boneCategory,
+        HashSet<int> leftSet,
+        HashSet<int> rightSet)
+    {
+        if (cat != 2) return;
+        BoneWeight bw = weights[vertIndex];
+        bool isLeft = false;
+        bool isRight = false;
+        CheckHandSide(bw.boneIndex0, boneCategory, ref isLeft, ref isRight);
+        CheckHandSide(bw.boneIndex1, boneCategory, ref isLeft, ref isRight);
+        CheckHandSide(bw.boneIndex2, boneCategory, ref isLeft, ref isRight);
+        CheckHandSide(bw.boneIndex3, boneCategory, ref isLeft, ref isRight);
+        if (isRight) rightSet.Add(vertIndex);
+        else leftSet.Add(vertIndex);
+    }
+
+    private static void CollectBoundaryBodyVertex(
+        int vertIndex,
+        int cat,
+        int t0, int t1, int t2,
+        BoneWeight[] weights,
+        int[] boneCategory,
+        HashSet<int> leftShoulderSet,
+        HashSet<int> rightShoulderSet,
+        Vector3[] origVerts)
+    {
+        if (cat != 0) return;
+
+        bool isLeft = false;
+        bool isRight = false;
+        CheckArmSideInTriangle(t0, weights, boneCategory, ref isLeft, ref isRight);
+        CheckArmSideInTriangle(t1, weights, boneCategory, ref isLeft, ref isRight);
+        CheckArmSideInTriangle(t2, weights, boneCategory, ref isLeft, ref isRight);
+
+        if (!isLeft && !isRight)
+        {
+            if (origVerts[vertIndex].x < 0f) isRight = true;
+            else isLeft = true;
+        }
+
+        if (isRight) rightShoulderSet.Add(vertIndex);
+        else leftShoulderSet.Add(vertIndex);
+    }
+
+    private static void CheckArmSideInTriangle(int vertIndex, BoneWeight[] weights, int[] boneCategory, ref bool isLeft, ref bool isRight)
+    {
+        BoneWeight bw = weights[vertIndex];
+        CheckArmBoneSide(bw.boneIndex0, bw.weight0, boneCategory, ref isLeft, ref isRight);
+        CheckArmBoneSide(bw.boneIndex1, bw.weight1, boneCategory, ref isLeft, ref isRight);
+        CheckArmBoneSide(bw.boneIndex2, bw.weight2, boneCategory, ref isLeft, ref isRight);
+        CheckArmBoneSide(bw.boneIndex3, bw.weight3, boneCategory, ref isLeft, ref isRight);
+    }
+
+    private static void CheckArmBoneSide(int boneIndex, float weight, int[] boneCategory, ref bool isLeft, ref bool isRight)
+    {
+        if (weight <= 0.001f || boneIndex < 0 || boneIndex >= boneCategory.Length) return;
+        int cat = boneCategory[boneIndex];
+        if (cat == 1) isLeft = true;
+        else if (cat == 2) isRight = true;
     }
 
     private static void AccumulateWeightCategory(int boneIndex, float weight, int[] boneCategory, ref float armWeight, ref float handWeight, ref float bodyWeight)
