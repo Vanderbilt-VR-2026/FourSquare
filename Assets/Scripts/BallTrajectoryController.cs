@@ -19,7 +19,7 @@ public class BallTrajectoryController : MonoBehaviour
     [SerializeField] private SphereCollider physicalCollider;
 
     [Header("Ball Reset")]
-    [SerializeField] private Vector3 initialDropPosition = new Vector3(0f, 2f, 0f);
+    [SerializeField] private Vector3 initialDropPosition = new Vector3(-1.28f, 2.08f, 39.38f);
     [SerializeField] private float autoResetYThreshold = -4f;
 
     [Header("Automatic Respawn")]
@@ -45,7 +45,7 @@ public class BallTrajectoryController : MonoBehaviour
     [Header("Trajectory Arc & Bounce")]
     [Tooltip("Peak height of the arc above launch point.")]
     [SerializeField, Min(0.3f)] private float arcApexHeight = 1.25f;
-    [SerializeField, Min(0.2f)] private float minimumFlightTime = 0.65f;
+    [SerializeField, Min(0.2f)] private float minimumFlightTime = 0.85f;
     [SerializeField, Min(0.5f)] private float maximumFlightTime = 2.5f;
 
     [Header("Test Strike")]
@@ -93,6 +93,16 @@ public class BallTrajectoryController : MonoBehaviour
         }
 
         ResetBall();
+    }
+
+    private Vector3 preCollisionVelocity;
+
+    private void FixedUpdate()
+    {
+        if (ballRigidbody != null)
+        {
+            preCollisionVelocity = ballRigidbody.linearVelocity;
+        }
     }
 
     private void Update()
@@ -318,14 +328,17 @@ public class BallTrajectoryController : MonoBehaviour
 
         Vector3 impulse = strikeVelocity;
 
-        if (impulse.magnitude > 4.5f)
+        float maxSmashSpeed = courtTargetManager != null ? courtTargetManager.MaximumSwingSpeed : 7.5f;
+        float minTapSpeed = courtTargetManager != null ? courtTargetManager.MinimumSwingSpeed : 0.8f;
+
+        if (impulse.magnitude > maxSmashSpeed)
         {
             // Overpowered smash: flies deep and out past the boundaries
             Vector3 smashDir = impulse.normalized;
             if (smashDir.y < 0.2f) smashDir.y = 0.3f;
             ballRigidbody.linearVelocity = smashDir.normalized * (impulse.magnitude * 1.3f);
         }
-        else if (impulse.magnitude < 0.8f)
+        else if (impulse.magnitude < minTapSpeed)
         {
             // Underpowered / weak tap: dribbles softly and drops short
             Vector3 weakDir = impulse.sqrMagnitude > 0.01f ? impulse.normalized : Vector3.forward;
@@ -343,6 +356,7 @@ public class BallTrajectoryController : MonoBehaviour
     private void OnCollisionEnter(Collision collision)
     {
         EvaluateGroundCollision(collision);
+        ApplyGroundBounceElasticity(collision);
     }
 
     private void OnCollisionStay(Collision collision)
@@ -365,6 +379,37 @@ public class BallTrajectoryController : MonoBehaviour
                 hasGroundContact = true;
                 return;
             }
+        }
+    }
+
+    private void ApplyGroundBounceElasticity(Collision collision)
+    {
+        if (ballRigidbody == null)
+            return;
+
+        bool isGroundContact = false;
+        for (int i = 0; i < collision.contactCount; i++)
+        {
+            ContactPoint contact = collision.GetContact(i);
+            if (contact.normal.y > 0.5f)
+            {
+                isGroundContact = true;
+                break;
+            }
+        }
+
+        if (!isGroundContact)
+            return;
+
+        // Treat ground bounce as perfectly elastic for the vertical velocity component.
+        // Preserves 100% of the incoming vertical energy/height so the ball returns to its pre-bounce apex height.
+        float incomingVy = Mathf.Max(Mathf.Abs(collision.relativeVelocity.y), Mathf.Abs(preCollisionVelocity.y));
+
+        if (incomingVy > 0.25f)
+        {
+            Vector3 currentVel = ballRigidbody.linearVelocity;
+            currentVel.y = incomingVy;
+            ballRigidbody.linearVelocity = currentVel;
         }
     }
 
@@ -504,7 +549,7 @@ public class BallTrajectoryController : MonoBehaviour
         }
 
         float minSpeed = courtTargetManager != null ? courtTargetManager.MinimumSwingSpeed : 0.8f;
-        float maxSpeed = courtTargetManager != null ? courtTargetManager.MaximumSwingSpeed : 4.8f;
+        float maxSpeed = courtTargetManager != null ? courtTargetManager.MaximumSwingSpeed : 7.5f;
         float normSpeed = Mathf.InverseLerp(minSpeed, maxSpeed, strikeSpeed);
 
         // Apex height scales with speed: soft hits arc low (0.85m), hard hits arc with energy (1.45m)
@@ -521,7 +566,7 @@ public class BallTrajectoryController : MonoBehaviour
 
         // Hard hits fly quicker (0.72x time) with punch; soft hits float gently (1.05x time)
         float kinematicTime = timeRise + timeFall;
-        float speedFlightFactor = Mathf.Lerp(1.05f, 0.72f, normSpeed);
+        float speedFlightFactor = Mathf.Lerp(1.15f, 0.90f, normSpeed);
         float totalFlightTime = Mathf.Clamp(kinematicTime * speedFlightFactor, minimumFlightTime, maximumFlightTime);
 
         // Calculate horizontal and vertical velocity to hit target accurately in totalFlightTime
