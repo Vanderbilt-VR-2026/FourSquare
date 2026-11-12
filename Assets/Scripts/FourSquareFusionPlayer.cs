@@ -67,7 +67,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private BallHandMarker[] handMarkers;
     private Collider[] bodyColliders;
-    private Behaviour[] locomotionProviders;
+    private UnityEngine.Behaviour[] locomotionProviders;
     private bool[] locomotionProviderInitiallyEnabled;
     private Camera rigCamera;
     private Renderer squareHeadRenderer;
@@ -420,10 +420,10 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void CacheLocomotionProviders()
     {
-        List<Behaviour> providers = new List<Behaviour>();
+        List<UnityEngine.Behaviour> providers = new List<UnityEngine.Behaviour>();
         List<bool> initiallyEnabled = new List<bool>();
-        Behaviour[] behaviours = GetComponentsInChildren<Behaviour>(true);
-        foreach (Behaviour behaviour in behaviours)
+        UnityEngine.Behaviour[] behaviours = GetComponentsInChildren<UnityEngine.Behaviour>(true);
+        foreach (UnityEngine.Behaviour behaviour in behaviours)
         {
             if (behaviour == null || !IsLocomotionProvider(behaviour.GetType().Name))
                 continue;
@@ -454,7 +454,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         for (int i = 0; i < locomotionProviders.Length; i++)
         {
-            Behaviour provider = locomotionProviders[i];
+            UnityEngine.Behaviour provider = locomotionProviders[i];
             if (provider == null)
                 continue;
 
