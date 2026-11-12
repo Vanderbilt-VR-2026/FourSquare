@@ -98,6 +98,8 @@ public static class CityGameplaySetup
         player.FindPropertyRelative("eliminationsCount").intValue = 0;
         managerSerialized.ApplyModifiedPropertiesWithoutUndo();
 
+        FourSquareFusionSetup.ConfigureCityRuntime(scene, court, ballPrefab);
+
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         Debug.Log("City gameplay setup completed: manager, ball spawn, bounds, join references, square IDs, and line faults.");

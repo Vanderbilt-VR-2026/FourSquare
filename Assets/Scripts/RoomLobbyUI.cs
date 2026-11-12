@@ -20,6 +20,7 @@ public class RoomLobbyUI : MonoBehaviour
     [SerializeField] private TMP_Text roomCodeText;
     [SerializeField] private TMP_Text playerCountText;
     [SerializeField] private TMP_Text playerListText;
+    [SerializeField] private TMP_Text lobbyStatusText;
     [SerializeField] private Button leaveRoomButton;
 
     private bool isLeaving = false;
@@ -55,6 +56,9 @@ public class RoomLobbyUI : MonoBehaviour
             0,
             multiplayerRoomManager.MaximumPlayers
         );
+        int playersNeeded = Mathf.Max(
+            0,
+            multiplayerRoomManager.RequiredPlayersCount - count);
 
         // Display the current Photon room code.
         if (roomCodeText != null)
@@ -69,10 +73,17 @@ public class RoomLobbyUI : MonoBehaviour
         // Display the number of connected players.
         if (playerCountText != null)
         {
+            string status = playersNeeded == 0
+                ? multiplayerRoomManager.IsSoloQuickStart
+                    ? "QUICK START: CONNECTED\nCITY STARTING..."
+                    : "STATUS: READY"
+                : $"STATUS: WAITING FOR {playersNeeded} MORE PLAYER" +
+                  (playersNeeded == 1 ? string.Empty : "S");
             playerCountText.text =
                 "PLAYERS: " + count + "/" + multiplayerRoomManager.MaximumPlayers +
                 "\nCITY STARTS AT: " +
-                multiplayerRoomManager.RequiredPlayersCount;
+                multiplayerRoomManager.RequiredPlayersCount +
+                "\n" + status;
         }
 
         // Display four player slots.
@@ -97,6 +108,14 @@ public class RoomLobbyUI : MonoBehaviour
             }
 
             playerListText.text = text.ToString();
+        }
+
+        if (lobbyStatusText != null)
+        {
+            lobbyStatusText.text = playersNeeded == 0
+                ? "READY - STARTING CITY"
+                : $"WAITING FOR {playersNeeded} MORE PLAYER" +
+                  (playersNeeded == 1 ? string.Empty : "S");
         }
     }
 
