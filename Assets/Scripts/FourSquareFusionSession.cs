@@ -305,6 +305,7 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
         foreach (Unity.XR.CoreUtils.XROrigin rig in existingRigs)
         {
             rig.gameObject.SetActive(false);
+            Destroy(rig.gameObject);
         }
     }
 

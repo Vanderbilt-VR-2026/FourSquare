@@ -141,7 +141,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void Start()
     {
-        if (Object == null || !Object.IsValid)
+        bool isFusionRunning = Runner != null && Runner.IsRunning;
+        if (!isFusionRunning && (Object == null || !Object.IsValid))
         {
             ConfigureRigForAuthority();
             EnsureRigBuilt();
@@ -850,7 +851,10 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void ConfigureRigForAuthority()
     {
-        bool isLocal = Object == null || !Object.IsValid || Object.HasInputAuthority;
+        bool isFusionRunning = Runner != null && Runner.IsRunning;
+        bool isLocal = isFusionRunning
+            ? (Object != null && Object.IsValid && Object.HasInputAuthority)
+            : (Object == null || !Object.IsValid || Object.HasInputAuthority);
         if (rigCamera != null) rigCamera.enabled = isLocal;
 
         foreach (AudioListener listener in GetComponentsInChildren<AudioListener>(true))
@@ -917,12 +921,15 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void Update()
     {
-        bool isLocal = Object == null || !Object.IsValid || Object.HasInputAuthority;
+        bool isFusionRunning = Runner != null && Runner.IsRunning;
+        bool isLocal = isFusionRunning
+            ? (Object != null && Object.IsValid && Object.HasInputAuthority)
+            : (Object == null || !Object.IsValid || Object.HasInputAuthority);
 
         if (isLocal)
         {
             ApplyLocalHandTargets();
-            if (Object == null || !Object.IsValid)
+            if (!isFusionRunning)
             {
                 if (head != null)
                 {
