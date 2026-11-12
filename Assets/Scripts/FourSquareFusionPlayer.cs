@@ -24,6 +24,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [Header("Remote Rig")]
     [SerializeField] private Renderer[] avatarRenderers;
     [SerializeField] private bool showLocalAvatar;
+    [SerializeField] private Material headVisualMaterial;
 
     [Networked] public Vector3 NetworkRootPosition { get; set; }
     [Networked] public Quaternion NetworkRootRotation { get; set; }
@@ -71,7 +72,6 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     private bool[] locomotionProviderInitiallyEnabled;
     private Camera rigCamera;
     private Renderer squareHeadRenderer;
-    private Material squareHeadMaterial;
     private int lastAppliedRole = int.MinValue;
     private bool movementLockApplied;
     private bool movementLocked;
@@ -126,20 +126,20 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         squareHeadRenderer = headObject.GetComponent<Renderer>();
         squareHeadRenderer.enabled = false;
 
-        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Unlit/Color");
-        if (shader == null) shader = Shader.Find("Standard");
-        if (shader == null)
+        if (headVisualMaterial == null
+            || headVisualMaterial.shader == null
+            || !headVisualMaterial.shader.isSupported
+            || headVisualMaterial.shader.name != "Universal Render Pipeline/Unlit")
         {
-            Debug.LogError("Could not find a shader for the placeholder square head.", this);
+            squareHeadRenderer.enabled = false;
+            Debug.LogError("Assign a supported URP Unlit material for the placeholder square head.", this);
             return;
         }
 
-        squareHeadMaterial = new Material(shader)
-        {
-            color = new Color(0.95f, 0.75f, 0.35f, 1f)
-        };
-        squareHeadRenderer.sharedMaterial = squareHeadMaterial;
+        squareHeadRenderer.sharedMaterial = headVisualMaterial;
+        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        propertyBlock.SetColor("_BaseColor", new Color(0.95f, 0.75f, 0.35f, 1f));
+        squareHeadRenderer.SetPropertyBlock(propertyBlock);
     }
 
     public override void Spawned()
@@ -341,8 +341,10 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         {
             if (avatarRenderer == null) continue;
 
-            bool isHandVisual = avatarRenderer.GetComponentInParent<BallHandMarker>() != null;
-            avatarRenderer.enabled = (isHandVisual && showTrackedHands) || renderAvatar;
+            if (avatarRenderer.GetComponentInParent<BallHandMarker>() != null)
+                continue;
+
+            avatarRenderer.enabled = renderAvatar;
         }
 
         foreach (BallHandMarker handMarker in handMarkers)
@@ -522,11 +524,4 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         return null;
     }
 
-    private void OnDestroy()
-    {
-        if (squareHeadMaterial != null)
-        {
-            Destroy(squareHeadMaterial);
-        }
-    }
 }
