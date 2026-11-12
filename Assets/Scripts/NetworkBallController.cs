@@ -218,6 +218,14 @@ public class NetworkBallController : NetworkBehaviour
         {
             preCollisionVelocity = ballRigidbody.linearVelocity;
         }
+
+        if (!HasGameplayAuthority || !preServeActive || ballRigidbody == null)
+            return;
+
+        float bob = Mathf.Abs(Mathf.Sin((Time.time - preServeStartTime) *
+                                        preServeBobFrequency * Mathf.PI * 2f)) *
+                    preServeBobHeight;
+        ballRigidbody.MovePosition(preServePosition + Vector3.up * bob);
     }
 
     private void Update()
@@ -242,17 +250,6 @@ public class NetworkBallController : NetworkBehaviour
 
         // 2. Keyboard test controls (works on State Authority and forwards via RPC on Proxies)
         HandleKeyboardInput();
-    }
-
-    private void FixedUpdate()
-    {
-        if (!HasGameplayAuthority || !preServeActive || ballRigidbody == null)
-            return;
-
-        float bob = Mathf.Abs(Mathf.Sin((Time.time - preServeStartTime) *
-                                        preServeBobFrequency * Mathf.PI * 2f)) *
-                    preServeBobHeight;
-        ballRigidbody.MovePosition(preServePosition + Vector3.up * bob);
     }
 
     private void HandleKeyboardInput()
