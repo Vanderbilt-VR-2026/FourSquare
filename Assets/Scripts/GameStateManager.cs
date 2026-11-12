@@ -137,7 +137,7 @@ public class GameStateManager : MonoBehaviour
     public void RegisterNetworkPlayer(FourSquareFusionPlayer networkPlayer)
     {
         if (networkPlayer == null) return;
-        if (!networkPlayer.HasPlayerInputAuthority)
+        if (!networkPlayer.HasPlayerAuthority)
         {
             Debug.LogError(
                 "Ignoring a Fusion player registration without a real PlayerRef. " +
