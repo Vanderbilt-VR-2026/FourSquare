@@ -141,7 +141,7 @@ public sealed class CityLobbyDisplay : MonoBehaviour
             : runner.ActivePlayers.Count();
         int maximumPlayers = roomManager != null ? roomManager.MaximumPlayers : 4;
         string gameStatus = FoursquareGameManager.Instance != null &&
-                            FoursquareGameManager.Instance.CurrentState == FoursquareGameState.Playing
+                            FoursquareGameManager.Instance.CurrentState != FoursquareGameState.WaitingToStart
             ? "GAME IN PROGRESS"
             : "IN CITY";
 

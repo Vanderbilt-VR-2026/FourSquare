@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Fusion;
 using UnityEngine;
@@ -75,6 +76,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     private int lastAppliedRole = int.MinValue;
     private bool movementLockApplied;
     private bool movementLocked;
+    private int activeTeleportLocks;
     private bool HasLocalAuthority =>
         Object != null
         && Object.IsValid
@@ -279,6 +281,48 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
     }
 
+    public void TeleportLocalRig(Vector3 position, Quaternion rotation)
+    {
+        if (!HasLocalAuthority || xrOrigin == null)
+            return;
+
+        activeTeleportLocks++;
+        UpdateGameplayMovementLock(force: true);
+
+        CharacterController characterController = xrOrigin.GetComponent<CharacterController>();
+        bool characterControllerWasEnabled = characterController != null && characterController.enabled;
+        bool teleportApplied = false;
+        try
+        {
+            if (characterController != null)
+                characterController.enabled = false;
+
+            xrOrigin.transform.SetPositionAndRotation(position, rotation);
+            Physics.SyncTransforms();
+            teleportApplied = true;
+        }
+        finally
+        {
+            if (characterController != null)
+                characterController.enabled = characterControllerWasEnabled;
+
+            if (teleportApplied)
+                StartCoroutine(ReleaseTeleportMovementLock());
+            else
+            {
+                activeTeleportLocks--;
+                UpdateGameplayMovementLock(force: true);
+            }
+        }
+    }
+
+    private IEnumerator ReleaseTeleportMovementLock()
+    {
+        yield return new WaitForFixedUpdate();
+        activeTeleportLocks = Mathf.Max(0, activeTeleportLocks - 1);
+        UpdateGameplayMovementLock(force: true);
+    }
+
     private void ApplyBallBodyCollisionFilter()
     {
         NetworkBallController[] networkBalls =
@@ -442,13 +486,14 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         FoursquareGameManager gameManager = FoursquareGameManager.Instance;
         bool gameInProgress = gameManager != null
-            ? gameManager.CurrentState == FoursquareGameState.Playing
+            ? gameManager.CurrentState != FoursquareGameState.WaitingToStart
             : GameStateManager.Instance != null && GameStateManager.Instance.HasGameStarted;
+        bool shouldLockMovement = gameInProgress || activeTeleportLocks > 0;
 
-        if (!force && movementLockApplied && movementLocked == gameInProgress)
+        if (!force && movementLockApplied && movementLocked == shouldLockMovement)
             return;
 
-        movementLocked = gameInProgress;
+        movementLocked = shouldLockMovement;
         movementLockApplied = true;
 
         if (locomotionProviders == null)

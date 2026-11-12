@@ -7,6 +7,9 @@ public class CourtLeaderboardBillboard : MonoBehaviour
 {
     private const float RefreshInterval = 1f;
     private const float CanvasScale = 0.004f;
+    private const float SideBoardCanvasScale = 0.0015f;
+    private const float SideBoardGroundClearance = 0.15f;
+    private const float SideBoardCourtOffset = 0.75f;
     private const int BoardWidth = 2000;
     private const int BoardHeight = 1400;
     public const float WorldWidth = BoardWidth * CanvasScale;
@@ -23,7 +26,8 @@ public class CourtLeaderboardBillboard : MonoBehaviour
     private Transform anchor;
     private Transform[] squareSpawnPoints;
     private Transform boardTransform;
-    private Text rosterText;
+    private Transform sideBoardTransform;
+    private readonly List<Text> rosterTexts = new List<Text>();
     private float heightOffset;
     private float nextRefreshTime;
     private bool previousGameStarted;
@@ -109,16 +113,19 @@ public class CourtLeaderboardBillboard : MonoBehaviour
     private void OnEnable()
     {
         if (boardTransform != null) boardTransform.gameObject.SetActive(true);
+        if (sideBoardTransform != null) sideBoardTransform.gameObject.SetActive(true);
     }
 
     private void OnDisable()
     {
         if (boardTransform != null) boardTransform.gameObject.SetActive(false);
+        if (sideBoardTransform != null) sideBoardTransform.gameObject.SetActive(false);
     }
 
     private void OnDestroy()
     {
         if (boardTransform != null) Destroy(boardTransform.gameObject);
+        if (sideBoardTransform != null) Destroy(sideBoardTransform.gameObject);
     }
 
     private void Update()
@@ -126,7 +133,7 @@ public class CourtLeaderboardBillboard : MonoBehaviour
         GameStateManager manager = GameStateManager.Instance;
         if (manager == null)
         {
-            rosterText.alignment = TextAnchor.MiddleCenter;
+            SetRosterAlignment(TextAnchor.MiddleCenter);
             SetRosterText("WAITING FOR PLAYERS", WaitingFontSize);
             return;
         }
@@ -272,12 +279,12 @@ public class CourtLeaderboardBillboard : MonoBehaviour
 
         if (!gameStarted)
         {
-            rosterText.alignment = TextAnchor.MiddleCenter;
+            SetRosterAlignment(TextAnchor.MiddleCenter);
             SetRosterText("WAITING FOR PLAYERS", WaitingFontSize);
             return;
         }
 
-        rosterText.alignment = TextAnchor.MiddleLeft;
+        SetRosterAlignment(TextAnchor.MiddleLeft);
         StringBuilder text = new StringBuilder();
         text.AppendLine("COURT LEADERBOARD");
         text.AppendLine("PLAYER | TIME IN RANK | RANK | SCORE");
@@ -321,34 +328,43 @@ public class CourtLeaderboardBillboard : MonoBehaviour
 
     private void SetRosterText(string value, int maximumFontSize = 0)
     {
-        rosterText.text = value;
-        RectTransform textRect = rosterText.rectTransform;
-        Vector2 availableSize = textRect.rect.size;
-        TextGenerator generator = rosterText.cachedTextGeneratorForLayout;
-        TextGenerationSettings settings = rosterText.GetGenerationSettings(availableSize);
-
-        int min = MinimumRankingFontSize;
-        int max = Mathf.CeilToInt(Mathf.Min(availableSize.x, availableSize.y));
-        if (maximumFontSize > 0) max = Mathf.Min(max, maximumFontSize);
-        int bestFit = min;
-        while (min <= max)
+        foreach (Text rosterText in rosterTexts)
         {
-            int candidate = min + (max - min) / 2;
-            settings.fontSize = candidate;
-            float preferredWidth = generator.GetPreferredWidth(value, settings);
-            float preferredHeight = generator.GetPreferredHeight(value, settings);
-            if (preferredWidth <= availableSize.x && preferredHeight <= availableSize.y)
-            {
-                bestFit = candidate;
-                min = candidate + 1;
-            }
-            else
-            {
-                max = candidate - 1;
-            }
-        }
+            rosterText.text = value;
+            RectTransform textRect = rosterText.rectTransform;
+            Vector2 availableSize = textRect.rect.size;
+            TextGenerator generator = rosterText.cachedTextGeneratorForLayout;
+            TextGenerationSettings settings = rosterText.GetGenerationSettings(availableSize);
 
-        rosterText.fontSize = bestFit;
+            int min = MinimumRankingFontSize;
+            int max = Mathf.CeilToInt(Mathf.Min(availableSize.x, availableSize.y));
+            if (maximumFontSize > 0) max = Mathf.Min(max, maximumFontSize);
+            int bestFit = min;
+            while (min <= max)
+            {
+                int candidate = min + (max - min) / 2;
+                settings.fontSize = candidate;
+                float preferredWidth = generator.GetPreferredWidth(value, settings);
+                float preferredHeight = generator.GetPreferredHeight(value, settings);
+                if (preferredWidth <= availableSize.x && preferredHeight <= availableSize.y)
+                {
+                    bestFit = candidate;
+                    min = candidate + 1;
+                }
+                else
+                {
+                    max = candidate - 1;
+                }
+            }
+
+            rosterText.fontSize = bestFit;
+        }
+    }
+
+    private void SetRosterAlignment(TextAnchor alignment)
+    {
+        foreach (Text rosterText in rosterTexts)
+            rosterText.alignment = alignment;
     }
 
     private string GetPlayerName(FourSquarePlayer player)
@@ -372,11 +388,40 @@ public class CourtLeaderboardBillboard : MonoBehaviour
 
     private void CreateBoard()
     {
-        GameObject canvasObject = new GameObject("Court Leaderboard", typeof(RectTransform));
+        GameObject canvasObject = CreateBoardCanvas("Court Leaderboard", out Text mainRosterText);
+        boardTransform = canvasObject.transform;
+        rosterTexts.Add(mainRosterText);
+        ApplyBoardPose();
+
+        GetBoardPose(anchor, courtBounds, squareSpawnPoints, heightOffset,
+            out Vector3 targetPosition, out Quaternion targetRotation);
+        Debug.Log(
+            $"[CourtLeaderboard] Created '{canvasObject.name}': parent='{canvasObject.transform.parent?.name}', " +
+            $"offset={heightOffset:F3}, targetPosition={targetPosition}, actualPosition={boardTransform.position}, " +
+            $"targetRotation={targetRotation.eulerAngles}, actualRotation={boardTransform.rotation.eulerAngles}, " +
+            $"localPosition={boardTransform.localPosition}, " +
+            $"lossyScale={boardTransform.lossyScale}, " +
+            $"bounds={(courtBounds != null ? courtBounds.bounds.ToString() : "NULL")}, " +
+            $"spawnPositions={GetSpawnPositionsForLog()}.",
+            this);
+
+        if (courtBounds != null)
+        {
+            GameObject sideCanvas = CreateBoardCanvas("Court Side Leaderboard", out Text sideRosterText);
+            sideBoardTransform = sideCanvas.transform;
+            sideBoardTransform.localScale = Vector3.one * SideBoardCanvasScale;
+            sideRosterText.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+            rosterTexts.Add(sideRosterText);
+            ApplySideBoardPose();
+        }
+    }
+
+    private GameObject CreateBoardCanvas(string objectName, out Text boardRosterText)
+    {
+        GameObject canvasObject = new GameObject(objectName, typeof(RectTransform));
         canvasObject.transform.SetParent(anchor, false);
         canvasObject.transform.localScale = Vector3.one * CanvasScale;
         RectTransform canvasRect = canvasObject.GetComponent<RectTransform>();
-        boardTransform = canvasRect;
 
         Canvas canvas = canvasObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
@@ -395,26 +440,15 @@ public class CourtLeaderboardBillboard : MonoBehaviour
         background.color = new Color(0.035f, 0.055f, 0.08f, 0.92f);
         panelObject.AddComponent<RectMask2D>();
 
-        rosterText = CreateText("Leaderboard Players", panelObject.transform, WaitingFontSize, TextAnchor.MiddleCenter);
-        RectTransform rosterRect = rosterText.rectTransform;
+        boardRosterText = CreateText(
+            "Leaderboard Players", panelObject.transform, WaitingFontSize, TextAnchor.MiddleCenter);
+        RectTransform rosterRect = boardRosterText.rectTransform;
         rosterRect.anchorMin = new Vector2(0.02f, 0.03f);
         rosterRect.anchorMax = new Vector2(0.98f, 0.97f);
         rosterRect.offsetMin = Vector2.zero;
         rosterRect.offsetMax = Vector2.zero;
-        rosterText.lineSpacing = 1.2f;
-
-        ApplyBoardPose();
-        GetBoardPose(anchor, courtBounds, squareSpawnPoints, heightOffset,
-            out Vector3 targetPosition, out Quaternion targetRotation);
-        Debug.Log(
-            $"[CourtLeaderboard] Created '{canvasObject.name}': parent='{canvasObject.transform.parent?.name}', " +
-            $"offset={heightOffset:F3}, targetPosition={targetPosition}, actualPosition={boardTransform.position}, " +
-            $"targetRotation={targetRotation.eulerAngles}, actualRotation={boardTransform.rotation.eulerAngles}, " +
-            $"localPosition={boardTransform.localPosition}, " +
-            $"lossyScale={boardTransform.lossyScale}, rectSize={canvasRect.sizeDelta}, " +
-            $"bounds={(courtBounds != null ? courtBounds.bounds.ToString() : "NULL")}, " +
-            $"spawnPositions={GetSpawnPositionsForLog()}.",
-            this);
+        boardRosterText.lineSpacing = 1.2f;
+        return canvasObject;
     }
 
     private void UpdateBoardPosition()
@@ -422,6 +456,7 @@ public class CourtLeaderboardBillboard : MonoBehaviour
         if (boardTransform == null || anchor == null) return;
 
         ApplyBoardPose();
+        ApplySideBoardPose();
     }
 
     private void ApplyBoardPose()
@@ -431,6 +466,44 @@ public class CourtLeaderboardBillboard : MonoBehaviour
         GetBoardPose(anchor, courtBounds, squareSpawnPoints, heightOffset,
             out Vector3 position, out Quaternion rotation);
         boardTransform.SetPositionAndRotation(position, rotation);
+    }
+
+    private void ApplySideBoardPose()
+    {
+        if (sideBoardTransform == null || courtBounds == null) return;
+
+        Transform boundsTransform = courtBounds.transform;
+        Vector3 outward = boundsTransform.forward;
+        Vector3 center = boundsTransform.TransformPoint(courtBounds.center);
+        float halfDepth = courtBounds.size.z * Mathf.Abs(boundsTransform.lossyScale.z) * 0.5f;
+        center += outward * (halfDepth + SideBoardCourtOffset);
+        float groundHeight = GetCourtGroundHeight();
+        center.y = groundHeight
+            + SideBoardGroundClearance
+            + BoardHeight * SideBoardCanvasScale * 0.5f;
+        sideBoardTransform.SetPositionAndRotation(
+            center,
+            Quaternion.LookRotation(-outward, Vector3.up));
+    }
+
+    private float GetCourtGroundHeight()
+    {
+        if (squareSpawnPoints != null)
+        {
+            float lowestSpawnHeight = float.PositiveInfinity;
+            foreach (Transform spawnPoint in squareSpawnPoints)
+            {
+                if (spawnPoint != null)
+                    lowestSpawnHeight = Mathf.Min(lowestSpawnHeight, spawnPoint.position.y);
+            }
+
+            if (!float.IsPositiveInfinity(lowestSpawnHeight))
+                return lowestSpawnHeight;
+        }
+
+        return courtBounds != null
+            ? courtBounds.bounds.min.y
+            : transform.position.y;
     }
 
     private string GetSpawnPositionsForLog()

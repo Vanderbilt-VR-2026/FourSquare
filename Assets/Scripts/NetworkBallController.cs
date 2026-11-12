@@ -37,6 +37,8 @@ public class NetworkBallController : NetworkBehaviour
     [SerializeField] private Transform ballSpawnPoint;
     [SerializeField] private Vector3 fallbackDropPosition = new Vector3(-1.28f, 2.03f, 39.38f);
     [SerializeField] private float autoResetYThreshold = -4f;
+    [SerializeField, Min(0.1f)] private float preServeBobHeight = 0.12f;
+    [SerializeField, Min(0.1f)] private float preServeBobFrequency = 1.5f;
 
     [Header("Automatic Respawn")]
     [Tooltip("Delay in seconds after leaving the playable court area before the ball automatically respawns.")]
@@ -57,6 +59,9 @@ public class NetworkBallController : NetworkBehaviour
     private float outOfBoundsTimer;
     private float groundSettledTimer;
     private bool hasGroundContact;
+    private bool preServeActive;
+    private Vector3 preServePosition;
+    private float preServeStartTime;
     private float lastBounceSoundTime = -100f;
 
     [Header("Trajectory Arc & Bounce")]
@@ -98,9 +103,9 @@ public class NetworkBallController : NetworkBehaviour
 
         ResetBall();
         GameStateManager.Instance?.ApplyNetworkGameStarted();
-        FoursquareGameManager.Instance?.ApplyNetworkState((int)FoursquareGameState.Playing);
+        FoursquareGameManager.Instance?.ApplyNetworkState((int)FoursquareGameState.WaitingToServe);
         if (IsNetworked)
-            RPC_NotifyGamePhase((int)FoursquareGameState.Playing);
+            RPC_NotifyGamePhase((int)FoursquareGameState.WaitingToServe);
         return true;
     }
 
@@ -210,6 +215,12 @@ public class NetworkBallController : NetworkBehaviour
         // 1. Authoritative simulation updates (Master Client only)
         if (HasGameplayAuthority)
         {
+            if (preServeActive)
+            {
+                HandleKeyboardInput();
+                return;
+            }
+
             if (transform.position.y < autoResetYThreshold)
             {
                 ResetBall();
@@ -221,6 +232,17 @@ public class NetworkBallController : NetworkBehaviour
 
         // 2. Keyboard test controls (works on State Authority and forwards via RPC on Proxies)
         HandleKeyboardInput();
+    }
+
+    private void FixedUpdate()
+    {
+        if (!HasGameplayAuthority || !preServeActive || ballRigidbody == null)
+            return;
+
+        float bob = Mathf.Abs(Mathf.Sin((Time.time - preServeStartTime) *
+                                        preServeBobFrequency * Mathf.PI * 2f)) *
+                    preServeBobHeight;
+        ballRigidbody.MovePosition(preServePosition + Vector3.up * bob);
     }
 
     private void HandleKeyboardInput()
@@ -293,6 +315,7 @@ public class NetworkBallController : NetworkBehaviour
         outOfBoundsTimer = 0f;
         groundSettledTimer = 0f;
         hasGroundContact = false;
+        preServeActive = false;
 
         Vector3 spawnPosition = GetSpawnPosition();
         Quaternion spawnRotation = GetSpawnRotation();
@@ -301,10 +324,14 @@ public class NetworkBallController : NetworkBehaviour
         {
             ballRigidbody.linearVelocity = Vector3.zero;
             ballRigidbody.angularVelocity = Vector3.zero;
-            ballRigidbody.isKinematic = false;
+            ballRigidbody.isKinematic = true;
+            ballRigidbody.useGravity = false;
             ballRigidbody.constraints = RigidbodyConstraints.None;
             transform.SetPositionAndRotation(spawnPosition, spawnRotation);
-            ballRigidbody.WakeUp();
+        }
+        else
+        {
+            transform.SetPositionAndRotation(spawnPosition, spawnRotation);
         }
 
         if (networkTransform != null)
@@ -312,7 +339,11 @@ public class NetworkBallController : NetworkBehaviour
             networkTransform.Teleport(spawnPosition, spawnRotation);
         }
 
+        preServePosition = spawnPosition;
+        preServeStartTime = Time.time;
+        preServeActive = true;
         Physics.SyncTransforms();
+        FoursquareGameManager.Instance?.PrepareForServe();
         Debug.Log($"[NetworkBallController] Ball reset to {spawnPosition}.", this);
     }
 
@@ -365,12 +396,16 @@ public class NetworkBallController : NetworkBehaviour
         SquareRole hitterRole = GetLocalPlayerRole(launchingSquare);
         if (HasGameplayAuthority)
         {
-            TryLaunchAuthoritative(strikeOrigin, strikeDirection, strikeSpeed, launchingSquare, hitterRole);
+            TryLaunchAuthoritative(
+                strikeOrigin, strikeDirection, strikeSpeed, launchingSquare, hitterRole,
+                isPhysicalHandStrike: false);
         }
         else if (Object != null && Object.IsValid)
         {
             PlayBallHitSound();
-            RPC_RequestHit(strikeOrigin, strikeDirection, strikeSpeed, launchingSquare, (int)hitterRole);
+            RPC_RequestHit(
+                strikeOrigin, strikeDirection, strikeSpeed, launchingSquare, (int)hitterRole,
+                isPhysicalHandStrike: false);
         }
     }
 
@@ -379,7 +414,8 @@ public class NetworkBallController : NetworkBehaviour
         Vector3 strikeDirection,
         float strikeSpeed,
         int launchingSquare,
-        SquareRole hitterRole)
+        SquareRole hitterRole,
+        bool isPhysicalHandStrike)
     {
         if (courtTargetManager == null)
             courtTargetManager = FindFirstObjectByType<CourtTargetManager>();
@@ -404,8 +440,16 @@ public class NetworkBallController : NetworkBehaviour
             return false;
         }
 
-        if (gameManager.CurrentState != FoursquareGameState.Playing)
+        bool isServe = gameManager.CurrentState == FoursquareGameState.WaitingToServe;
+        if (isServe)
+        {
+            if (!isPhysicalHandStrike || hitterRole != gameManager.ServingRole)
+                return false;
+        }
+        else if (gameManager.CurrentState != FoursquareGameState.Playing)
+        {
             return false;
+        }
 
         if (lastAuthoritativeHitTimes.TryGetValue(hitterRole, out float lastHitTime) &&
             Time.time < lastHitTime + hitCooldown)
@@ -428,8 +472,13 @@ public class NetworkBallController : NetworkBehaviour
                 this);
             return false;
         }
-        if (!foursquareBall.RegisterPlayerHit(
-            hitterRole, targetFound ? selection.targetSquare : -1))
+        if (isServe)
+        {
+            if (!gameManager.TryBeginServe(hitterRole))
+                return false;
+        }
+        else if (!foursquareBall.RegisterPlayerHit(
+                     hitterRole, targetFound ? selection.targetSquare : -1))
         {
             return false;
         }
@@ -450,6 +499,11 @@ public class NetworkBallController : NetworkBehaviour
     }
 
     private void OnTriggerEnter(Collider other)
+    {
+        TryHitWithHand(other);
+    }
+
+    private void OnTriggerStay(Collider other)
     {
         TryHitWithHand(other);
     }
@@ -512,13 +566,15 @@ public class NetworkBallController : NetworkBehaviour
         if (HasGameplayAuthority)
         {
             TryLaunchAuthoritative(
-                transform.position, strikeDirection, strikeSpeed, currentSquare, hand.PlayerRole);
+                transform.position, strikeDirection, strikeSpeed, currentSquare, hand.PlayerRole,
+                isPhysicalHandStrike: true);
         }
         else if (Object != null && Object.IsValid)
         {
             PlayBallHitSound();
             RPC_RequestHit(
-                transform.position, strikeDirection, strikeSpeed, currentSquare, (int)hand.PlayerRole);
+                transform.position, strikeDirection, strikeSpeed, currentSquare, (int)hand.PlayerRole,
+                isPhysicalHandStrike: true);
         }
     }
 
@@ -529,6 +585,7 @@ public class NetworkBallController : NetworkBehaviour
         float strikeSpeed,
         int launchingSquare,
         int hitterRole,
+        bool isPhysicalHandStrike,
         RpcInfo info = default)
     {
         if (!HasGameplayAuthority)
@@ -543,7 +600,8 @@ public class NetworkBallController : NetworkBehaviour
         }
 
         TryLaunchAuthoritative(
-            strikeOrigin, strikeDirection, strikeSpeed, launchingSquare, (SquareRole)hitterRole);
+            strikeOrigin, strikeDirection, strikeSpeed, launchingSquare, (SquareRole)hitterRole,
+            isPhysicalHandStrike);
     }
 
     [Rpc(RpcSources.StateAuthority, RpcTargets.All)]
@@ -553,7 +611,8 @@ public class NetworkBallController : NetworkBehaviour
             return;
 
         FoursquareGameManager.Instance?.ApplyNetworkState(stateValue);
-        if (stateValue == (int)FoursquareGameState.Playing)
+        if (stateValue == (int)FoursquareGameState.Playing ||
+            stateValue == (int)FoursquareGameState.WaitingToServe)
             GameStateManager.Instance?.ApplyNetworkGameStarted();
     }
 
@@ -599,6 +658,8 @@ public class NetworkBallController : NetworkBehaviour
     {
         if (ballRigidbody == null) return;
 
+        preServeActive = false;
+        ballRigidbody.useGravity = true;
         ballRigidbody.isKinematic = false;
         ballRigidbody.constraints = RigidbodyConstraints.None;
         ballRigidbody.WakeUp();
@@ -631,6 +692,11 @@ public class NetworkBallController : NetworkBehaviour
             Debug.LogError("NetworkBallController requires a Rigidbody.", this);
             return;
         }
+
+        preServeActive = false;
+        ballRigidbody.useGravity = true;
+        ballRigidbody.isKinematic = false;
+        ballRigidbody.constraints = RigidbodyConstraints.None;
 
         Vector3 origin = originOverride ?? transform.position;
         Vector3 horizontalDelta = Vector3.ProjectOnPlane(target - origin, Vector3.up);
@@ -665,8 +731,6 @@ public class NetworkBallController : NetworkBehaviour
         float launchVy = (target.y - origin.y + 0.5f * gravityMagnitude * totalFlightTime * totalFlightTime) / totalFlightTime;
         Vector3 launchVelocity = velocityXZ + Vector3.up * launchVy;
 
-        ballRigidbody.isKinematic = false;
-        ballRigidbody.constraints = RigidbodyConstraints.None;
         ballRigidbody.WakeUp();
         ballRigidbody.linearVelocity = launchVelocity;
         ballRigidbody.angularVelocity = Vector3.zero;
@@ -839,6 +903,8 @@ public class NetworkBallController : NetworkBehaviour
         minimumHandSpeed = Mathf.Max(0f, minimumHandSpeed);
         minimumHandApproachSpeed = Mathf.Max(0f, minimumHandApproachSpeed);
         hitCooldown = Mathf.Max(0f, hitCooldown);
+        preServeBobHeight = Mathf.Max(0.1f, preServeBobHeight);
+        preServeBobFrequency = Mathf.Max(0.1f, preServeBobFrequency);
         arcApexHeight = Mathf.Max(0.3f, arcApexHeight);
         minimumFlightTime = Mathf.Max(0.2f, minimumFlightTime);
         maximumFlightTime = Mathf.Max(minimumFlightTime, maximumFlightTime);

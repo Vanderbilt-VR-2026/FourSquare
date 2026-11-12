@@ -16,11 +16,13 @@ public sealed class FoursquareBall : MonoBehaviour
     public event Action<SquareRole> OnGroundBounce;
     public event Action<SquareRole> OnPlayerHit;
     public event Action<SquareRole> OnRuleViolation;
+    public event Action<int> OnBallEnteredSquare;
     public event Action OnOutOfBounds;
     public event Func<SquareRole, int, bool> PlayerHitRequested;
 
     private MaterialPropertyBlock propertyBlock;
     private int currentSquareIndex = -1;
+    private int lastObservedSquareIndex = -1;
 
     private void Awake()
     {
@@ -42,6 +44,21 @@ public sealed class FoursquareBall : MonoBehaviour
         {
             SetDefaultColor();
         }
+    }
+
+    private void FixedUpdate()
+    {
+        if (!HasGameplayAuthority() || court == null)
+            return;
+
+        int squareIndex = court.TryGetSquareIndex(transform.position, out int currentSquareIndex)
+            ? currentSquareIndex
+            : -1;
+        if (squareIndex == lastObservedSquareIndex)
+            return;
+
+        lastObservedSquareIndex = squareIndex;
+        OnBallEnteredSquare?.Invoke(squareIndex);
     }
 
     public bool RegisterPlayerHit(SquareRole role, int targetSquareIndex)
@@ -97,7 +114,8 @@ public sealed class FoursquareBall : MonoBehaviour
         if (!landedOnFloor)
             return;
 
-        SquareRole role = FoursquareCourt.GetRoleForSquare(square.squareID - 1);
+        int squareIndex = square.squareID - 1;
+        SquareRole role = FoursquareCourt.GetRoleForSquare(squareIndex);
         if (role == SquareRole.Spectator)
         {
             Debug.LogError($"CourtSquare '{square.name}' has invalid square ID {square.squareID}.", square);
@@ -105,7 +123,12 @@ public sealed class FoursquareBall : MonoBehaviour
         }
 
         Debug.Log($"[FourSquare] Ball bounced in {role} square ({square.name}).", this);
-        SetSquareColor(square.squareID - 1);
+        if (lastObservedSquareIndex != squareIndex)
+        {
+            lastObservedSquareIndex = squareIndex;
+            OnBallEnteredSquare?.Invoke(squareIndex);
+        }
+        SetSquareColor(squareIndex);
         OnGroundBounce?.Invoke(role);
     }
 

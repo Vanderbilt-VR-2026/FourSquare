@@ -14,15 +14,19 @@ public sealed class FoursquareCourt : MonoBehaviour
     [Tooltip("Ordered Square 1 through Square 4. Square 4 is the King's square.")]
     [SerializeField] private Transform[] squareSpawnPoints = new Transform[SquareCount];
     [SerializeField] private Transform kingServePoint;
+    [SerializeField, Min(0f)] private float kingServeForwardOffset = 0.75f;
+    [SerializeField] private float kingServeHeadHeightOffset = -0.2f;
+    [SerializeField, Min(0.1f)] private float kingServeFallbackHeightOffset = 1.1f;
+    [SerializeField, Min(0f)] private float kingServeBoundaryInset = 0.35f;
 
     [Header("Square Ball Colors")]
-    [Tooltip("Colors used when the matching square renderer has no readable color material.")]
+    [Tooltip("Fallback colors ordered by the scene's Square 1 through Square 4 IDs.")]
     [SerializeField] private Color[] squareColors =
     {
         new Color(0.20f, 0.55f, 1.00f),
+        new Color(1.00f, 0.78f, 0.18f),
         new Color(1.00f, 0.28f, 0.24f),
-        new Color(0.30f, 0.85f, 0.38f),
-        new Color(1.00f, 0.78f, 0.18f)
+        new Color(0.30f, 0.85f, 0.38f)
     };
     [Tooltip("Optional floor renderers ordered Square 1 through Square 4.")]
     [SerializeField] private Renderer[] squareRenderers = new Renderer[SquareCount];
@@ -69,9 +73,10 @@ public sealed class FoursquareCourt : MonoBehaviour
 
         bool isEast = localPosition.x >= center.x;
         bool isNorth = localPosition.z >= center.z;
+        // The scene lays out Square 1 northwest, 2 northeast, 3 southeast, and 4 southwest.
         squareIndex = isEast
-            ? (isNorth ? 2 : 1)
-            : (isNorth ? 3 : 0);
+            ? (isNorth ? 1 : 2)
+            : (isNorth ? 0 : 3);
         return true;
     }
 
@@ -116,22 +121,94 @@ public sealed class FoursquareCourt : MonoBehaviour
 
     public bool TryGetKingServePose(out Vector3 position, out Quaternion rotation)
     {
-        Transform servePoint = kingServePoint != null
-            ? kingServePoint
-            : GetSpawnPoint(SquareRole.King);
-        if (servePoint == null)
+        Transform kingSpawnPoint = GetSpawnPoint(SquareRole.King);
+        Transform servePoint = kingServePoint != null ? kingServePoint : kingSpawnPoint;
+        FourSquareFusionPlayer kingPlayer = null;
+        FourSquareFusionPlayer[] players =
+            FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+        foreach (FourSquareFusionPlayer player in players)
         {
-            Debug.LogError("FoursquareCourt has no King serve point or Square 4 spawn point.", this);
+            if (player != null && player.PlayerRole == SquareRole.King)
+            {
+                kingPlayer = player;
+                break;
+            }
+        }
+
+        if (servePoint == null && kingPlayer == null)
+        {
+            Debug.LogError("FoursquareCourt has no King serve point, Square 4 spawn point, or King player.", this);
             position = default;
             rotation = Quaternion.identity;
             return false;
         }
 
-        position = servePoint.position;
-        rotation = servePoint.rotation;
-        if (kingServePoint == null)
-            position += Vector3.up * 1.5f;
+        Transform head = kingPlayer != null ? kingPlayer.HeadTransform : null;
+        Transform forwardSource = head != null
+            ? head
+            : kingPlayer != null ? kingPlayer.transform : servePoint;
+        Vector3 forward = Vector3.ProjectOnPlane(forwardSource.forward, Vector3.up);
+        if (forward.sqrMagnitude < 0.0001f)
+            forward = Vector3.forward;
+        else
+            forward.Normalize();
+
+        rotation = Quaternion.LookRotation(forward, Vector3.up);
+        if (head != null)
+        {
+            position = head.position + forward * kingServeForwardOffset;
+            position.y = head.position.y + kingServeHeadHeightOffset;
+        }
+        else if (kingPlayer != null)
+        {
+            position = kingPlayer.transform.position + forward * kingServeForwardOffset;
+            position.y = (kingSpawnPoint != null ? kingSpawnPoint.position.y : kingPlayer.transform.position.y)
+                + kingServeFallbackHeightOffset;
+        }
+        else if (kingServePoint != null)
+        {
+            position = kingServePoint.position;
+            rotation = kingServePoint.rotation;
+        }
+        else
+        {
+            position = servePoint.position + forward * kingServeForwardOffset;
+            position.y += kingServeFallbackHeightOffset;
+        }
+
+        ClampServePositionToKingSquare(ref position);
         return true;
+    }
+
+    private void ClampServePositionToKingSquare(ref Vector3 position)
+    {
+        Transform kingSpawnPoint = GetSpawnPoint(SquareRole.King);
+        if (courtBounds == null || kingSpawnPoint == null)
+            return;
+
+        Vector3 localPosition = courtBounds.transform.InverseTransformPoint(position);
+        Vector3 kingLocalPosition = courtBounds.transform.InverseTransformPoint(kingSpawnPoint.position);
+        Vector3 center = courtBounds.center;
+        Vector3 halfSize = courtBounds.size * 0.5f;
+        Vector3 boundsScale = courtBounds.transform.lossyScale;
+        float insetX = Mathf.Min(
+            kingServeBoundaryInset / Mathf.Max(0.0001f, Mathf.Abs(boundsScale.x)),
+            halfSize.x * 0.45f);
+        float insetZ = Mathf.Min(
+            kingServeBoundaryInset / Mathf.Max(0.0001f, Mathf.Abs(boundsScale.z)),
+            halfSize.z * 0.45f);
+        bool kingSquareIsEast = kingLocalPosition.x >= center.x;
+        bool kingSquareIsNorth = kingLocalPosition.z >= center.z;
+
+        localPosition.x = Mathf.Clamp(
+            localPosition.x,
+            kingSquareIsEast ? center.x + insetX : center.x - halfSize.x + insetX,
+            kingSquareIsEast ? center.x + halfSize.x - insetX : center.x - insetX);
+        localPosition.z = Mathf.Clamp(
+            localPosition.z,
+            kingSquareIsNorth ? center.z + insetZ : center.z - halfSize.z + insetZ,
+            kingSquareIsNorth ? center.z + halfSize.z - insetZ : center.z - insetZ);
+        position = courtBounds.transform.TransformPoint(localPosition);
     }
 
     public void TeleportAllPlayersToAssignedQuadrants()

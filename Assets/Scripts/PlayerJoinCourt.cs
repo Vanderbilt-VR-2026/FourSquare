@@ -530,7 +530,6 @@ public class PlayerJoinCourt : MonoBehaviour
     private static void TeleportPlayer(XROrigin xrOrigin, Transform targetSpawn, BoxCollider courtBounds)
     {
         CharacterController characterController = xrOrigin.GetComponent<CharacterController>();
-        if (characterController != null) characterController.enabled = false;
 
         Vector3 facingDirection = courtBounds != null
             ? courtBounds.bounds.center - targetSpawn.position
@@ -545,10 +544,27 @@ public class PlayerJoinCourt : MonoBehaviour
         Quaternion targetRotation = facingDirection.sqrMagnitude >= 0.0001f
             ? Quaternion.LookRotation(facingDirection.normalized, Vector3.up)
             : targetSpawn.rotation;
-        xrOrigin.transform.SetPositionAndRotation(targetSpawn.position, targetRotation);
-        Physics.SyncTransforms();
 
-        if (characterController != null) characterController.enabled = true;
+        FourSquareFusionPlayer networkPlayer =
+            xrOrigin.GetComponent<FourSquareFusionPlayer>();
+        if (networkPlayer != null && networkPlayer.IsLocallyOwned)
+        {
+            networkPlayer.TeleportLocalRig(targetSpawn.position, targetRotation);
+            return;
+        }
+
+        bool characterControllerWasEnabled = characterController != null && characterController.enabled;
+        try
+        {
+            if (characterController != null) characterController.enabled = false;
+            xrOrigin.transform.SetPositionAndRotation(targetSpawn.position, targetRotation);
+            Physics.SyncTransforms();
+        }
+        finally
+        {
+            if (characterController != null)
+                characterController.enabled = characterControllerWasEnabled;
+        }
     }
 
     private static Transform FindHand(Transform root, string handName)
@@ -987,15 +1003,31 @@ public class PlayerJoinCourt : MonoBehaviour
     private static void TeleportPlayerToExit(XROrigin xrOrigin, Transform exitPoint)
     {
         CharacterController characterController = xrOrigin.GetComponent<CharacterController>();
+        FourSquareFusionPlayer networkPlayer =
+            xrOrigin.GetComponent<FourSquareFusionPlayer>();
         Vector3 targetPosition = new Vector3(
             exitPoint.position.x,
             xrOrigin.transform.position.y,
             exitPoint.position.z);
 
-        if (characterController != null) characterController.enabled = false;
-        xrOrigin.transform.SetPositionAndRotation(targetPosition, exitPoint.rotation);
-        Physics.SyncTransforms();
-        if (characterController != null) characterController.enabled = true;
+        if (networkPlayer != null && networkPlayer.IsLocallyOwned)
+        {
+            networkPlayer.TeleportLocalRig(targetPosition, exitPoint.rotation);
+            return;
+        }
+
+        bool characterControllerWasEnabled = characterController != null && characterController.enabled;
+        try
+        {
+            if (characterController != null) characterController.enabled = false;
+            xrOrigin.transform.SetPositionAndRotation(targetPosition, exitPoint.rotation);
+            Physics.SyncTransforms();
+        }
+        finally
+        {
+            if (characterController != null)
+                characterController.enabled = characterControllerWasEnabled;
+        }
     }
 
     private static void UpdateAllPopupMessages()

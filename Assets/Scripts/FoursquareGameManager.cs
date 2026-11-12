@@ -6,7 +6,8 @@ public enum FoursquareGameState
 {
     WaitingToStart,
     Playing,
-    RoundOver
+    RoundOver,
+    WaitingToServe
 }
 
 [DisallowMultipleComponent]
@@ -25,6 +26,7 @@ public sealed class FoursquareGameManager : MonoBehaviour
     private SquareRole lastBouncedRole = SquareRole.Spectator;
     private SquareRole lastPlayerRole = SquareRole.King;
     private int bounceCount;
+    private int lastTrackedSquareIndex = -1;
     private int lastEliminationFrame = -1;
 
     public event Action<FoursquareGameState> OnStateChanged;
@@ -35,6 +37,7 @@ public sealed class FoursquareGameManager : MonoBehaviour
         gameStateManager != null ? gameStateManager.Players : Array.Empty<FourSquarePlayer>();
     public IReadOnlyList<FourSquarePlayer> CurrentRanking => rankingSnapshot;
     public SquareRole LastPlayerRole => lastPlayerRole;
+    public SquareRole ServingRole => SquareRole.King;
 
     private bool HasGameplayAuthority =>
         networkBall == null || !networkBall.IsNetworked || networkBall.HasGameplayAuthority;
@@ -62,6 +65,7 @@ public sealed class FoursquareGameManager : MonoBehaviour
         if (ball != null)
         {
             ball.OnGroundBounce += RegisterBallBounce;
+            ball.OnBallEnteredSquare += RegisterBallEnteredSquare;
             ball.OnOutOfBounds += ReportOutOfBounds;
             ball.PlayerHitRequested += RegisterPlayerHit;
         }
@@ -93,7 +97,7 @@ public sealed class FoursquareGameManager : MonoBehaviour
             gameStateManager.EnsureSoloPlayerKing();
             CaptureRankingSnapshot();
             ResetRuleState();
-            SetState(FoursquareGameState.Playing);
+            SetState(FoursquareGameState.WaitingToServe);
         }
     }
 
@@ -106,6 +110,7 @@ public sealed class FoursquareGameManager : MonoBehaviour
         if (ball != null)
         {
             ball.OnGroundBounce -= RegisterBallBounce;
+            ball.OnBallEnteredSquare -= RegisterBallEnteredSquare;
             ball.OnOutOfBounds -= ReportOutOfBounds;
             ball.PlayerHitRequested -= RegisterPlayerHit;
         }
@@ -135,12 +140,13 @@ public sealed class FoursquareGameManager : MonoBehaviour
         if (currentState != FoursquareGameState.Playing || !HasGameplayAuthority)
             return;
 
-        if (!IsActiveRole(role))
+        if (role < SquareRole.Peasant || role > SquareRole.King)
         {
-            Debug.LogWarning($"Ignoring a bounce in unoccupied square role {role}.", this);
+            Debug.LogWarning($"Ignoring a bounce in invalid square role {role}.", this);
             return;
         }
 
+        lastTrackedSquareIndex = (int)role - 1;
         if (lastBouncedRole == role)
         {
             bounceCount++;
@@ -153,8 +159,43 @@ public sealed class FoursquareGameManager : MonoBehaviour
 
         if (bounceCount > 1)
         {
-            EliminateForFault(role, "The ball bounced twice in the same square.");
+            int squareIndex = (int)role - 1;
+            string squareName = GetSquareName(squareIndex);
+            if (TryGetPlayerInSquare(squareIndex, role, out FourSquarePlayer player, out SquareRole playerRole))
+            {
+                string playerName = string.IsNullOrWhiteSpace(player.playerName)
+                    ? string.IsNullOrWhiteSpace(player.playerId) ? "Unknown Player" : player.playerId
+                    : player.playerName;
+                Debug.Log(
+                    $"[FourSquare] Player {playerName}/{player.playerId} in {squareName} " +
+                    "got eliminated due to a double bounce!");
+                EliminateForFault(playerRole, "The ball bounced twice in the same square.");
+            }
+            else
+            {
+                HandleEmptySquareDoubleBounce(squareName);
+            }
         }
+    }
+
+    private void RegisterBallEnteredSquare(int squareIndex)
+    {
+        if (currentState != FoursquareGameState.Playing || !HasGameplayAuthority)
+            return;
+
+        if (squareIndex < 0 || squareIndex >= FoursquareCourt.SquareCount)
+        {
+            lastTrackedSquareIndex = -1;
+            return;
+        }
+
+        if (lastTrackedSquareIndex >= 0 && lastTrackedSquareIndex != squareIndex)
+        {
+            lastBouncedRole = SquareRole.Spectator;
+            bounceCount = 0;
+        }
+
+        lastTrackedSquareIndex = squareIndex;
     }
 
     public bool RegisterPlayerHit(SquareRole hitterRole, int targetSquareIndex)
@@ -195,7 +236,39 @@ public sealed class FoursquareGameManager : MonoBehaviour
         lastPlayerRole = hitterRole;
         lastBouncedRole = SquareRole.Spectator;
         bounceCount = 0;
+        lastTrackedSquareIndex = -1;
         return true;
+    }
+
+    public bool TryBeginServe(SquareRole serverRole)
+    {
+        if (currentState != FoursquareGameState.WaitingToServe ||
+            !HasGameplayAuthority ||
+            serverRole != ServingRole ||
+            !IsActiveRole(serverRole))
+        {
+            return false;
+        }
+
+        ResetRuleState();
+        lastPlayerRole = serverRole;
+        SetState(FoursquareGameState.Playing);
+        BroadcastState(FoursquareGameState.Playing);
+        return true;
+    }
+
+    public void PrepareForServe()
+    {
+        if (!HasGameplayAuthority ||
+            gameStateManager == null ||
+            !gameStateManager.HasGameStarted)
+        {
+            return;
+        }
+
+        ResetRuleState();
+        SetState(FoursquareGameState.WaitingToServe);
+        BroadcastState(FoursquareGameState.WaitingToServe);
     }
 
     public void ReportOutOfBounds()
@@ -218,7 +291,8 @@ public sealed class FoursquareGameManager : MonoBehaviour
         }
 
         SetState((FoursquareGameState)stateValue);
-        if (currentState == FoursquareGameState.Playing)
+        if (currentState == FoursquareGameState.Playing ||
+            currentState == FoursquareGameState.WaitingToServe)
             ResetRuleState();
     }
 
@@ -227,6 +301,7 @@ public sealed class FoursquareGameManager : MonoBehaviour
         lastBouncedRole = SquareRole.Spectator;
         lastPlayerRole = SquareRole.King;
         bounceCount = 0;
+        lastTrackedSquareIndex = -1;
     }
 
     private void HandleGameStarted()
@@ -234,7 +309,7 @@ public sealed class FoursquareGameManager : MonoBehaviour
         gameStateManager?.EnsureSoloPlayerKing();
         CaptureRankingSnapshot();
         ResetRuleState();
-        SetState(FoursquareGameState.Playing);
+        SetState(FoursquareGameState.WaitingToServe);
         court?.TeleportAllPlayersToAssignedQuadrants();
     }
 
@@ -262,8 +337,6 @@ public sealed class FoursquareGameManager : MonoBehaviour
         court?.TeleportAllPlayersToAssignedQuadrants();
         networkBall?.ResetBall();
         ResetRuleState();
-        SetState(FoursquareGameState.Playing);
-        BroadcastState(FoursquareGameState.Playing);
         if (networkBall != null)
         {
             Debug.Log(
@@ -271,6 +344,88 @@ public sealed class FoursquareGameManager : MonoBehaviour
                 $"the ball is reset for the King serve at {networkBall.transform.position}.",
                 networkBall);
         }
+    }
+
+    private void HandleEmptySquareDoubleBounce(string squareName)
+    {
+        if (Time.frameCount == lastEliminationFrame || !HasGameplayAuthority)
+            return;
+
+        lastEliminationFrame = Time.frameCount;
+        Debug.Log($"[FourSquare] {squareName} rank got eliminated (empty square)!");
+        CaptureRankingSnapshot();
+        SetState(FoursquareGameState.RoundOver);
+        BroadcastState(FoursquareGameState.RoundOver);
+        court?.TeleportAllPlayersToAssignedQuadrants();
+        networkBall?.ResetBall();
+        ResetRuleState();
+    }
+
+    private bool TryGetPlayerInSquare(
+        int squareIndex,
+        SquareRole squareRole,
+        out FourSquarePlayer player,
+        out SquareRole playerRole)
+    {
+        player = null;
+        playerRole = SquareRole.Spectator;
+        if (gameStateManager == null)
+            return false;
+
+        CaptureRankingSnapshot();
+        foreach (FourSquarePlayer rankedPlayer in rankingSnapshot)
+        {
+            if (rankedPlayer.currentRole != squareRole)
+                continue;
+
+            player = rankedPlayer;
+            playerRole = rankedPlayer.currentRole;
+            return true;
+        }
+
+        if (court == null)
+            return false;
+
+        FourSquareFusionPlayer[] networkPlayers =
+            FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+        foreach (FourSquareFusionPlayer networkPlayer in networkPlayers)
+        {
+            if (networkPlayer == null || networkPlayer.PlayerRole == SquareRole.Spectator)
+                continue;
+
+            Vector3 position = networkPlayer.Object != null && networkPlayer.Object.IsValid
+                ? networkPlayer.NetworkRootPosition
+                : networkPlayer.transform.position;
+            if (!court.TryGetSquareIndex(position, out int occupiedSquareIndex) ||
+                occupiedSquareIndex != squareIndex)
+            {
+                continue;
+            }
+
+            foreach (FourSquarePlayer rankedPlayer in rankingSnapshot)
+            {
+                if (rankedPlayer.playerId != networkPlayer.PlayerId)
+                    continue;
+
+                player = rankedPlayer;
+                playerRole = rankedPlayer.currentRole;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private string GetSquareName(int squareIndex)
+    {
+        CourtSquare[] squares = FindObjectsByType<CourtSquare>(FindObjectsSortMode.None);
+        foreach (CourtSquare square in squares)
+        {
+            if (square != null && square.squareID == squareIndex + 1)
+                return square.name;
+        }
+
+        return $"Square {squareIndex + 1}";
     }
 
     private bool IsActiveRole(SquareRole role)

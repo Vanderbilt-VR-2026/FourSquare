@@ -104997,6 +104997,17 @@ MonoBehaviour:
   - {fileID: 1475596676}
   - {fileID: 927862965}
   kingServePoint: {fileID: 0}
+  squareColors:
+  - {r: 0.2, g: 0.55, b: 1, a: 1}
+  - {r: 1, g: 0.78, b: 0.18, a: 1}
+  - {r: 1, g: 0.28, b: 0.24, a: 1}
+  - {r: 0.3, g: 0.85, b: 0.38, a: 1}
+  squareRenderers:
+  - {fileID: 927862969}
+  - {fileID: 1475596680}
+  - {fileID: 1614564541}
+  - {fileID: 1604830118}
+  useFloorMaterialColors: 1
 --- !u!65 &1104708178
 BoxCollider:
   m_ObjectHideFlags: 0
