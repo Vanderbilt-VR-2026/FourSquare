@@ -108,6 +108,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     private Transform leftHandBone;
     private Transform rightHandBone;
     private bool floatingMeshInitialized;
+    private GameObject leftShoulderCap;
+    private GameObject rightShoulderCap;
 
     private void Awake()
     {
@@ -417,6 +419,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         {
             squareHeadRenderer.enabled = !isLocal;
         }
+
+        UpdateShoulderCapsVisibility(isLocal);
 
         if (isLocal)
         {
@@ -739,8 +743,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             Matrix4x4 bindPose = (leftShoulderIndex >= 0 && bindposes != null && leftShoulderIndex < bindposes.Length)
                 ? bindposes[leftShoulderIndex] : Matrix4x4.identity;
             ComputeOpeningBounds(leftShoulderIndices, origVertices, bindPose, out Vector3 centroid, out Vector3 extents);
-            GameObject cap = CreateCapObject("LeftShoulderCap", leftShoulderBone, centroid, extents, capMaterial, capLayer);
-            if (cap != null) newRenderers.Add(cap.GetComponent<Renderer>());
+            leftShoulderCap = CreateCapObject("LeftShoulderCap", leftShoulderBone, centroid, extents, capMaterial, capLayer);
         }
 
         // 4. Right Shoulder Cap (attached to rightShoulderBone)
@@ -751,11 +754,16 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             Matrix4x4 bindPose = (rightShoulderIndex >= 0 && bindposes != null && rightShoulderIndex < bindposes.Length)
                 ? bindposes[rightShoulderIndex] : Matrix4x4.identity;
             ComputeOpeningBounds(rightShoulderIndices, origVertices, bindPose, out Vector3 centroid, out Vector3 extents);
-            GameObject cap = CreateCapObject("RightShoulderCap", rightShoulderBone, centroid, extents, capMaterial, capLayer);
-            if (cap != null) newRenderers.Add(cap.GetComponent<Renderer>());
+            rightShoulderCap = CreateCapObject("RightShoulderCap", rightShoulderBone, centroid, extents, capMaterial, capLayer);
         }
 
         avatarRenderers = newRenderers.ToArray();
+
+        bool isFusionRunning = Runner != null && Runner.IsRunning;
+        bool isLocal = isFusionRunning
+            ? HasLocalAuthority
+            : (Object == null || !Object.IsValid || Object.HasInputAuthority);
+        UpdateShoulderCapsVisibility(isLocal);
     }
 
     private static GameObject CreateCapObject(
@@ -1245,6 +1253,29 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             {
                 if (headRenderer != null) headRenderer.gameObject.layer = isLocal ? localHeadLayer : defaultLayer;
             }
+        }
+
+        UpdateShoulderCapsVisibility(isLocal);
+    }
+
+    private void UpdateShoulderCapsVisibility(bool isLocal)
+    {
+        int localHeadLayer = LayerMask.NameToLayer("LocalHead");
+        int defaultLayer = LayerMask.NameToLayer("Default");
+        if (localHeadLayer == -1) localHeadLayer = defaultLayer;
+
+        if (leftShoulderCap != null)
+        {
+            leftShoulderCap.layer = isLocal ? localHeadLayer : defaultLayer;
+            Renderer r = leftShoulderCap.GetComponent<Renderer>();
+            if (r != null) r.enabled = !isLocal;
+        }
+
+        if (rightShoulderCap != null)
+        {
+            rightShoulderCap.layer = isLocal ? localHeadLayer : defaultLayer;
+            Renderer r = rightShoulderCap.GetComponent<Renderer>();
+            if (r != null) r.enabled = !isLocal;
         }
     }
 
