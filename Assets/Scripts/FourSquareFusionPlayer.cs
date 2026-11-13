@@ -22,6 +22,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [SerializeField] private bool showLocalAvatar;
     [SerializeField] private Material headVisualMaterial;
 
+
     [Header("Mixamo Avatar & IK Setup")]
     [SerializeField] private Transform stickmanTransform;
     [SerializeField] private Transform ikLeftHandTarget;

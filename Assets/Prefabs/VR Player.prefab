@@ -135,6 +135,7 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   showLocalAvatar: 1
+  headVisualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   stickmanTransform: {fileID: 78742514300378218}
   ikLeftHandTarget: {fileID: 6699786381531832581}
   ikRightHandTarget: {fileID: 4274216734714271850}
@@ -293,7 +294,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
   visualCubeSize: 0.12
-  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  handVisualPrefab: {fileID: 0}
+  visualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   playerRole: 0
 --- !u!1 &2293859493816063479
 GameObject:
@@ -416,7 +418,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BallHandMarker
   handColliderRadius: 0.08
   visualCubeSize: 0.12
-  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  handVisualPrefab: {fileID: 0}
+  visualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   playerRole: 0
 --- !u!1 &2564747234580309914
 GameObject:

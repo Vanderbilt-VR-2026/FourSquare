@@ -4,6 +4,7 @@ public class BallHandMarker : MonoBehaviour
 {
     [SerializeField] private float handColliderRadius = 0.08f;
     [SerializeField, Min(0.01f)] private float visualCubeSize = 0.12f;
+    [SerializeField] private GameObject handVisualPrefab;
     [SerializeField] private Material visualMaterial;
     [SerializeField] private SquareRole playerRole = SquareRole.Spectator;
 
@@ -15,9 +16,10 @@ public class BallHandMarker : MonoBehaviour
     private float lastUpdateTime;
     private readonly Vector3[] recentVelocities = new Vector3[4];
     private int velocityIndex;
-    private Renderer visualRenderer;
+    private Renderer[] visualRenderers;
     private SphereCollider handCollider;
     private bool visualVisible = false;
+    private bool hasValidVisual;
 
     public void SetPlayerRole(SquareRole role)
     {
@@ -52,8 +54,51 @@ public class BallHandMarker : MonoBehaviour
 
     private void CreateHandVisual()
     {
-        Renderer[] childRenderers = GetComponentsInChildren<Renderer>(true);
-        foreach (Renderer childRenderer in childRenderers)
+        if (handVisualPrefab != null)
+        {
+            Renderer[] previousRenderers = GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer existingRenderer in previousRenderers)
+            {
+                if (existingRenderer.transform != transform)
+                    existingRenderer.gameObject.SetActive(false);
+            }
+
+            GameObject handVisual = Instantiate(handVisualPrefab, transform, false);
+            handVisual.name = handVisualPrefab.name;
+            foreach (Behaviour behaviour in handVisual.GetComponentsInChildren<Behaviour>(true))
+            {
+                behaviour.enabled = false;
+            }
+
+            visualRenderers = handVisual.GetComponentsInChildren<Renderer>(true);
+            hasValidVisual = visualRenderers.Length > 0 && IsSupportedUrpMaterial(visualMaterial);
+            if (!hasValidVisual)
+            {
+                foreach (Renderer renderer in visualRenderers)
+                {
+                    if (renderer != null) renderer.enabled = false;
+                }
+
+                Debug.LogError(
+                    "Hand visual requires a supported Universal Render Pipeline Lit or Unlit material.",
+                    this);
+                return;
+            }
+
+            foreach (Renderer renderer in visualRenderers)
+            {
+                if (renderer == null) continue;
+
+                renderer.sharedMaterial = visualMaterial;
+                renderer.enabled = false;
+            }
+            return;
+        }
+
+        bool isNetworkedPlayer = GetComponentInParent<FourSquareFusionPlayer>() != null;
+        Renderer[] existingRenderers = GetComponentsInChildren<Renderer>(true);
+        Renderer visualRenderer = null;
+        foreach (Renderer childRenderer in existingRenderers)
         {
             if (childRenderer.transform == transform) continue;
 
@@ -66,6 +111,15 @@ public class BallHandMarker : MonoBehaviour
 
         if (visualRenderer == null)
         {
+            if (isNetworkedPlayer)
+            {
+                visualRenderers = System.Array.Empty<Renderer>();
+                Debug.LogError(
+                    "A networked player's hand has no cube mesh assigned; refusing to create a runtime fallback.",
+                    this);
+                return;
+            }
+
             GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
             visual.name = "Hand Cube";
             visual.transform.SetParent(transform, false);
@@ -79,29 +133,53 @@ public class BallHandMarker : MonoBehaviour
             visualRenderer = visual.GetComponent<Renderer>();
         }
 
-        if (visualMaterial == null)
+        visualRenderers = new[] { visualRenderer };
+        if (!IsSupportedUrpMaterial(visualMaterial))
         {
-            Debug.LogError("Assign a build-included material to the hand marker visual.", this);
+            Debug.LogError(
+                "Hand marker visual requires a supported Universal Render Pipeline Lit or Unlit material.",
+                this);
             visualRenderer.enabled = false;
             return;
         }
 
-        visualRenderer.enabled = false;
+        hasValidVisual = true;
         visualRenderer.sharedMaterial = visualMaterial;
+        visualRenderer.enabled = visualVisible && hasValidVisual;
+        visualRenderer.gameObject.SetActive(true);
+    }
+
+    private static bool IsSupportedUrpMaterial(Material material)
+    {
+        if (material == null || material.shader == null || !material.shader.isSupported)
+            return false;
+
+        string shaderName = material.shader.name;
+        return shaderName == "Universal Render Pipeline/Lit"
+            || shaderName == "Universal Render Pipeline/Unlit";
     }
 
     public void SetTrackingActive(bool active)
     {
-        if (visualRenderer != null) visualRenderer.enabled = active && visualVisible && visualMaterial != null;
+        if (visualRenderers != null)
+        {
+            foreach (Renderer renderer in visualRenderers)
+            {
+                if (renderer != null) renderer.enabled = active && visualVisible && hasValidVisual;
+            }
+        }
         if (handCollider != null) handCollider.enabled = active;
     }
 
     public void SetVisualVisible(bool visible)
     {
         visualVisible = visible;
-        if (visualRenderer != null)
+        if (visualRenderers != null)
         {
-            visualRenderer.enabled = visualVisible && visualMaterial != null;
+            foreach (Renderer renderer in visualRenderers)
+            {
+                if (renderer != null) renderer.enabled = visualVisible && hasValidVisual;
+            }
         }
     }
 
