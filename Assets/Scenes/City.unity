@@ -137662,7 +137662,6 @@ GameObject:
   - component: {fileID: 1443982761}
   - component: {fileID: 1443982760}
   - component: {fileID: 1443982759}
-  - component: {fileID: 1443982752}
   m_Layer: 0
   m_Name: Test Ball
   m_TagString: Untagged
@@ -137670,40 +137669,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1443982752
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1443982751}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 63448aae82ecf6c47a8adffce14a962d, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::BallTrajectoryController
-  courtTargetManager: {fileID: 632038654}
-  ballRigidbody: {fileID: 1443982753}
-  handHitZone: {fileID: 1443982758}
-  physicalCollider: {fileID: 1443982755}
-  initialDropPosition: {x: -1.28, y: 2.03, z: 39.38}
-  autoResetYThreshold: -4
-  outOfBoundsRespawnDelay: 3
-  groundSettledDuration: 1
-  restLinearSpeedThreshold: 0.15
-  restAngularSpeedThreshold: 0.6
-  groundCheckTolerance: 0.08
-  arcApexHeight: 1.25
-  minimumFlightTime: 0.85
-  maximumFlightTime: 2.5
-  sourceSquare: 3
-  horizontalStrikeDirection: {x: 0, y: 0, z: -1}
-  swingSpeed: 2.5
-  directionTurnSpeed: 90
-  keyboardHandStrikeKey: 102
-  handHitRadius: 0.32
-  minimumHandSpeed: 0.25
-  hitCooldown: 0.25
 --- !u!54 &1443982753
 Rigidbody:
   m_ObjectHideFlags: 0
