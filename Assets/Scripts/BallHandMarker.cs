@@ -18,6 +18,7 @@ public class BallHandMarker : MonoBehaviour
     private int velocityIndex;
     private Renderer[] visualRenderers;
     private SphereCollider handCollider;
+    private bool visualVisible = false;
     private bool hasValidVisual;
 
     public void SetPlayerRole(SquareRole role)
@@ -144,7 +145,7 @@ public class BallHandMarker : MonoBehaviour
 
         hasValidVisual = true;
         visualRenderer.sharedMaterial = visualMaterial;
-        visualRenderer.enabled = !isNetworkedPlayer;
+        visualRenderer.enabled = visualVisible && hasValidVisual;
         visualRenderer.gameObject.SetActive(true);
     }
 
@@ -164,10 +165,22 @@ public class BallHandMarker : MonoBehaviour
         {
             foreach (Renderer renderer in visualRenderers)
             {
-                if (renderer != null) renderer.enabled = active && hasValidVisual;
+                if (renderer != null) renderer.enabled = active && visualVisible && hasValidVisual;
             }
         }
         if (handCollider != null) handCollider.enabled = active;
+    }
+
+    public void SetVisualVisible(bool visible)
+    {
+        visualVisible = visible;
+        if (visualRenderers != null)
+        {
+            foreach (Renderer renderer in visualRenderers)
+            {
+                if (renderer != null) renderer.enabled = visualVisible && hasValidVisual;
+            }
+        }
     }
 
     private void Update()
