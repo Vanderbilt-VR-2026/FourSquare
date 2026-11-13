@@ -41,6 +41,13 @@ public class StartScreenUI : MonoBehaviour
     [Header("Multiplayer")]
     [SerializeField] private MultiplayerRoomManager multiplayerRoomManager;
 
+
+    [Header("How To Play")]
+    [SerializeField] private Button howToPlayButton;
+    [SerializeField] private Button howToPlayBackButton;
+    [SerializeField] private GameObject howToPlayPanel;
+     
+     
     [Header("Connection Status")]
     [SerializeField] private TMP_Text connectionStatusText;
     [SerializeField] private TMP_Text joinConnectionStatusText;
@@ -141,6 +148,13 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.onClick.AddListener(OnJoinRoomConfirmed);
+
+        if (howToPlayButton != null)
+            howToPlayButton.onClick.AddListener(ShowHowToPlayPanel);
+
+        if (howToPlayBackButton != null)
+            howToPlayBackButton.onClick.AddListener(ShowStartScreen);
+            
     }
 
     private void OnDisable()
@@ -162,6 +176,12 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.onClick.RemoveListener(OnJoinRoomConfirmed);
+
+        if (howToPlayButton != null)
+            howToPlayButton.onClick.RemoveListener(ShowHowToPlayPanel);
+
+        if (howToPlayBackButton != null)
+            howToPlayBackButton.onClick.RemoveListener(ShowStartScreen);
     }
 
     // ---------------- PANELS ----------------
@@ -179,6 +199,9 @@ public class StartScreenUI : MonoBehaviour
 
         if (roomLobbyPanel != null)
             roomLobbyPanel.SetActive(false);
+
+        if (howToPlayPanel != null)
+            howToPlayPanel.SetActive(false);
     }
 
     private void ShowStartScreen()
@@ -205,6 +228,17 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomPanel != null)
             joinRoomPanel.SetActive(true);
+    }
+
+    private void ShowHowToPlayPanel()
+    {
+        if (isConnecting)
+            return;
+
+        SetAllPanelsInactive();
+
+        if (howToPlayPanel != null)
+            howToPlayPanel.SetActive(true);
     }
 
     private void ShowLobby()
