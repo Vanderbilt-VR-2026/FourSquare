@@ -10,7 +10,7 @@
         "CachedStaticCollidersSize": 64
     },
     "PhysicsForecast": false,
-    "EnqueueIncompleteSynchronousSpawns": false,
+    "EnqueueIncompleteSynchronousSpawns": true,
     "InvokeRenderMode": 1,
     "NetworkIdIsObjectName": false,
     "HideNetworkObjectInactivityGuard": false,
