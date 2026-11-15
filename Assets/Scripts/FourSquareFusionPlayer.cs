@@ -13,7 +13,6 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [SerializeField] private Transform head;
     [SerializeField] private Transform leftHand;
     [SerializeField] private Transform rightHand;
-    [SerializeField] private RoomCodeOverlayUI playerOverlay;
 
     [Header("Remote Rig")]
     [SerializeField] private Renderer[] avatarRenderers;
@@ -60,6 +59,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         : "Unknown Player";
 
     private BallHandMarker[] handMarkers;
+    private Collider[] bodyColliders;
     private Camera rigCamera;
     private Renderer squareHeadRenderer;
     private Material squareHeadMaterial;
@@ -90,6 +90,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         rigCamera = head != null ? head.GetComponent<Camera>() : GetComponentInChildren<Camera>(true);
         handMarkers = GetComponentsInChildren<BallHandMarker>(true);
+        bodyColliders = GetComponents<Collider>();
         if (GetComponent<PlayerNameTag>() == null)
             gameObject.AddComponent<PlayerNameTag>();
     }
@@ -149,7 +150,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
 
         ConfigureRigForAuthority();
-        AttachPlayerOverlay();
+        if (HasLocalAuthority)
+            CreateCityLobbyDisplay();
         GameStateManager.Instance?.RegisterNetworkPlayer(this);
     }
 
@@ -231,6 +233,45 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         RPC_RequestGameStart();
     }
 
+    public void IgnoreBallBodyCollision(NetworkBallController networkBall)
+    {
+        if (networkBall == null)
+            return;
+
+        if (bodyColliders == null || bodyColliders.Length == 0)
+            bodyColliders = GetComponents<Collider>();
+
+        foreach (Collider bodyCollider in bodyColliders)
+        {
+            if (bodyCollider != null)
+                networkBall.IgnorePlayerBodyCollision(bodyCollider);
+        }
+    }
+
+    public void TeleportLocalRig(Vector3 position, Quaternion rotation)
+    {
+        if (!HasLocalAuthority || xrOrigin == null)
+            return;
+
+        CharacterController characterController = xrOrigin.GetComponent<CharacterController>();
+        bool characterControllerWasEnabled =
+            characterController != null && characterController.enabled;
+
+        try
+        {
+            if (characterController != null)
+                characterController.enabled = false;
+
+            xrOrigin.transform.SetPositionAndRotation(position, rotation);
+            Physics.SyncTransforms();
+        }
+        finally
+        {
+            if (characterController != null)
+                characterController.enabled = characterControllerWasEnabled;
+        }
+    }
+
     [Rpc(RpcSources.All, RpcTargets.All)]
     public void RPC_RequestGameStart()
     {
@@ -264,7 +305,6 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         bool isLocal = HasLocalAuthority;
         if (rigCamera != null) rigCamera.enabled = isLocal;
-        if (playerOverlay != null) playerOverlay.SetVisible(isLocal);
 
         foreach (AudioListener listener in GetComponentsInChildren<AudioListener>(true))
         {
@@ -310,14 +350,6 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
     }
 
-    private void AttachPlayerOverlay()
-    {
-        if (!HasLocalAuthority || head == null) return;
-
-        if (playerOverlay != null)
-            playerOverlay.AttachToHead(head);
-    }
-
     private void Update()
     {
         if (Object == null || !Object.IsValid || !HasLocalAuthority) return;
@@ -327,6 +359,21 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         {
             if (handMarker != null) handMarker.SetTrackingActive(showTrackedHands);
         }
+    }
+
+    private void CreateCityLobbyDisplay()
+    {
+        if (head == null)
+        {
+            Debug.LogError(
+                "Cannot show City lobby status because the local XR head transform is not assigned.",
+                this);
+            return;
+        }
+
+        GameObject displayObject = new GameObject("City Lobby Status");
+        CityLobbyDisplay display = displayObject.AddComponent<CityLobbyDisplay>();
+        display.Initialize(head, rigCamera);
     }
 
     private static bool HasXRTracking()

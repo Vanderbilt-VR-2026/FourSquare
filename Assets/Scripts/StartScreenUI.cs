@@ -11,29 +11,21 @@ public class StartScreenUI : MonoBehaviour
     [SerializeField] private Button createRoomButton;
     [SerializeField] private Button joinRoomButton;
     [SerializeField] private Button quitButton;
-    [SerializeField] private Button createRoomBackButton;
     [SerializeField] private Button joinRoomBackButton;
     [SerializeField] private Button joinRoomConfirmButton;
 
     [Header("Panels")]
     [SerializeField] private GameObject startScreenPanel;
-    [SerializeField] private GameObject createRoomPanel;
     [SerializeField] private GameObject joinRoomPanel;
-
-    [Header("Multiplayer Lobby")]
-    [SerializeField] private GameObject roomLobbyPanel;
 
     [Header("VR Menu Placement")]
     [SerializeField] private Transform playerCamera;
     [SerializeField] private Transform menuCanvas;
     [SerializeField] private float menuDistance = 2f;
-    [SerializeField] private float menuHeightOffset = 0.15f;
-    [SerializeField] private float fallbackCameraHeight = 1.6f;
     [SerializeField] private float trackingInitializationTimeout = 5f;
 
     [Header("Room Creation")]
     [SerializeField] private RoomCodeManager roomCodeManager;
-    [SerializeField] private TMP_Text roomCodeText;
 
     [Header("Join Room")]
     [SerializeField] private TMP_InputField roomCodeInputField;
@@ -44,7 +36,6 @@ public class StartScreenUI : MonoBehaviour
     [Header("Multiplayer")]
     [SerializeField] private MultiplayerRoomManager multiplayerRoomManager;
 
-    private string currentRoomCode;
     private bool isConnecting = false;
     private TMP_Text createRoomButtonText;
     private TMP_Text joinRoomConfirmButtonText;
@@ -52,9 +43,19 @@ public class StartScreenUI : MonoBehaviour
     private string joinRoomConfirmButtonLabel;
     private float loadingAnimationTimer;
     private int loadingDotCount;
+    private Camera startupOverlayCamera;
+    private CameraClearFlags startupCameraClearFlags;
+    private Color startupCameraBackgroundColor;
+    private int startupCameraCullingMask;
+    private bool isStartupOverlayVisible;
+    private static StartScreenUI startupInstance;
 
     private IEnumerator Start()
     {
+        if (startupInstance != null)
+            yield break;
+
+        startupInstance = this;
         CacheButtonLabels();
         SetConnectionStatus(string.Empty);
         SetAllPanelsInactive();
@@ -65,6 +66,8 @@ public class StartScreenUI : MonoBehaviour
             ShowStartScreen();
             yield break;
         }
+
+        ShowStartupOverlay();
 
         Canvas canvas = menuCanvas.GetComponent<Canvas>();
         if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
@@ -82,6 +85,7 @@ public class StartScreenUI : MonoBehaviour
                     "The world-space start menu needs an enabled event camera. Assign an enabled camera " +
                     "to Player Camera or tag it MainCamera.",
                     this);
+                HideStartupOverlay();
                 ShowStartScreen();
                 yield break;
             }
@@ -91,11 +95,14 @@ public class StartScreenUI : MonoBehaviour
 
         yield return new WaitForSecondsRealtime(0.5f);
         bool hasTrackedHeadPose = HasTrackedHeadPose();
-        CenterMenuInFrontOfPlayer(hasTrackedHeadPose);
+        PlacePlayerInFrontOfMenu();
         ShowStartScreen();
 
         if (hasTrackedHeadPose)
+        {
+            HideStartupOverlay();
             yield break;
+        }
 
         float elapsed = 0f;
         while (elapsed < trackingInitializationTimeout)
@@ -105,10 +112,51 @@ public class StartScreenUI : MonoBehaviour
 
             if (HasTrackedHeadPose())
             {
-                CenterMenuInFrontOfPlayer(true);
+                PlacePlayerInFrontOfMenu();
+                HideStartupOverlay();
                 yield break;
             }
         }
+
+        HideStartupOverlay();
+    }
+
+    private void OnDestroy()
+    {
+        if (startupInstance == this)
+            startupInstance = null;
+    }
+
+    private void ShowStartupOverlay()
+    {
+        Camera camera = playerCamera.GetComponent<Camera>();
+        if (camera == null)
+            camera = Camera.main;
+
+        if (camera == null)
+            return;
+
+        startupOverlayCamera = camera;
+        startupCameraClearFlags = camera.clearFlags;
+        startupCameraBackgroundColor = camera.backgroundColor;
+        startupCameraCullingMask = camera.cullingMask;
+        isStartupOverlayVisible = true;
+
+        camera.clearFlags = CameraClearFlags.SolidColor;
+        camera.backgroundColor = Color.black;
+        camera.cullingMask = 0;
+    }
+
+    private void HideStartupOverlay()
+    {
+        if (!isStartupOverlayVisible || startupOverlayCamera == null)
+            return;
+
+        startupOverlayCamera.clearFlags = startupCameraClearFlags;
+        startupOverlayCamera.backgroundColor = startupCameraBackgroundColor;
+        startupOverlayCamera.cullingMask = startupCameraCullingMask;
+        startupOverlayCamera = null;
+        isStartupOverlayVisible = false;
     }
 
     private void OnEnable()
@@ -121,9 +169,6 @@ public class StartScreenUI : MonoBehaviour
 
         if (quitButton != null)
             quitButton.onClick.AddListener(OnQuitClicked);
-
-        if (createRoomBackButton != null)
-            createRoomBackButton.onClick.AddListener(OnBackClicked);
 
         if (joinRoomBackButton != null)
             joinRoomBackButton.onClick.AddListener(OnBackClicked);
@@ -142,9 +187,6 @@ public class StartScreenUI : MonoBehaviour
 
         if (quitButton != null)
             quitButton.onClick.RemoveListener(OnQuitClicked);
-
-        if (createRoomBackButton != null)
-            createRoomBackButton.onClick.RemoveListener(OnBackClicked);
 
         if (joinRoomBackButton != null)
             joinRoomBackButton.onClick.RemoveListener(OnBackClicked);
@@ -229,14 +271,8 @@ public class StartScreenUI : MonoBehaviour
         if (startScreenPanel != null)
             startScreenPanel.SetActive(false);
 
-        if (createRoomPanel != null)
-            createRoomPanel.SetActive(false);
-
         if (joinRoomPanel != null)
             joinRoomPanel.SetActive(false);
-
-        if (roomLobbyPanel != null)
-            roomLobbyPanel.SetActive(false);
     }
 
     private void ShowStartScreen()
@@ -247,37 +283,12 @@ public class StartScreenUI : MonoBehaviour
             startScreenPanel.SetActive(true);
     }
 
-    private void ShowCreateRoomPanel()
-    {
-        SetAllPanelsInactive();
-
-        if (createRoomPanel != null)
-            createRoomPanel.SetActive(true);
-    }
-
     private void ShowJoinRoomPanel()
     {
         SetAllPanelsInactive();
 
         if (joinRoomPanel != null)
             joinRoomPanel.SetActive(true);
-    }
-
-    private void ShowLobby()
-    {
-        SetAllPanelsInactive();
-
-        if (roomLobbyPanel != null)
-        {
-            roomLobbyPanel.SetActive(true);
-            Debug.Log("Multiplayer lobby opened.");
-        }
-        else
-        {
-            Debug.LogError(
-                "RoomLobbyPanel is not assigned in StartScreenUI."
-            );
-        }
     }
 
     private bool HasTrackedHeadPose()
@@ -287,34 +298,50 @@ public class StartScreenUI : MonoBehaviour
             playerCamera.position.y - playerCamera.root.position.y > 0.5f;
     }
 
-    private void CenterMenuInFrontOfPlayer(bool useTrackedHeight)
+    private void PlacePlayerInFrontOfMenu()
     {
         if (playerCamera == null || menuCanvas == null)
             return;
 
-        Vector3 forward = Vector3.ProjectOnPlane(
+        Transform playerRoot = playerCamera.root;
+        if (playerRoot == null)
+            return;
+
+        Vector3 menuForward = Vector3.ProjectOnPlane(
+            menuCanvas.forward,
+            Vector3.up
+        );
+
+        if (menuForward.sqrMagnitude < 0.001f)
+            return;
+
+        menuForward.Normalize();
+
+        Vector3 cameraForward = Vector3.ProjectOnPlane(
             playerCamera.forward,
             Vector3.up
         );
 
-        if (forward.sqrMagnitude < 0.001f)
-            forward = Vector3.forward;
+        if (cameraForward.sqrMagnitude > 0.001f)
+        {
+            cameraForward.Normalize();
+            float yawCorrection = Vector3.SignedAngle(
+                cameraForward,
+                menuForward,
+                Vector3.up
+            );
+            playerRoot.rotation =
+                Quaternion.AngleAxis(yawCorrection, Vector3.up) * playerRoot.rotation;
+        }
 
-        forward.Normalize();
+        Vector3 menuCenter = menuCanvas.position;
+        RectTransform menuRect = menuCanvas as RectTransform;
+        if (menuRect != null)
+            menuCenter = menuRect.TransformPoint(menuRect.rect.center);
 
-        Vector3 targetPosition =
-            playerCamera.position + forward * menuDistance;
-
-        targetPosition.y = useTrackedHeight
-            ? playerCamera.position.y + menuHeightOffset
-            : playerCamera.root.position.y + fallbackCameraHeight + menuHeightOffset;
-
-        menuCanvas.position = targetPosition;
-
-        menuCanvas.rotation = Quaternion.LookRotation(
-            forward,
-            Vector3.up
-        );
+        Vector3 targetCameraPosition = menuCenter - menuForward * menuDistance;
+        targetCameraPosition.y = playerCamera.position.y;
+        playerRoot.position += targetCameraPosition - playerCamera.position;
     }
 
     private async void OnCreateRoomClicked()
@@ -331,15 +358,8 @@ public class StartScreenUI : MonoBehaviour
             return;
         }
 
-        // If already connected, reopen the existing lobby.
         if (multiplayerRoomManager.IsConnected)
-        {
-            currentRoomCode =
-                multiplayerRoomManager.CurrentRoomCode;
-
-            ShowLobby();
             return;
-        }
 
         BeginConnectionFeedback("Creating room...");
 
@@ -357,14 +377,7 @@ public class StartScreenUI : MonoBehaviour
 
             if (success)
             {
-                currentRoomCode = code;
-
-                DisplayRoomCode(code);
-
                 Debug.Log("Room created: " + code);
-
-                // Open the multiplayer lobby.
-                ShowLobby();
             }
             else
             {
@@ -389,12 +402,6 @@ public class StartScreenUI : MonoBehaviour
         }
     }
 
-    private void DisplayRoomCode(string code)
-    {
-        if (roomCodeText != null)
-            roomCodeText.text = "ROOM CODE: " + code;
-    }
-
     private void OnJoinRoomClicked()
     {
         if (isConnecting)
@@ -402,10 +409,7 @@ public class StartScreenUI : MonoBehaviour
 
         if (multiplayerRoomManager != null &&
             multiplayerRoomManager.IsConnected)
-        {
-            ShowLobby();
             return;
-        }
 
         ShowJoinRoomPanel();
 
@@ -465,14 +469,9 @@ public class StartScreenUI : MonoBehaviour
 
             if (success)
             {
-                currentRoomCode = code;
-
                 Debug.Log(
                     "Successfully joined room: " + code
                 );
-
-                // Show the lobby after joining.
-                ShowLobby();
             }
             else
             {
@@ -503,13 +502,6 @@ public class StartScreenUI : MonoBehaviour
             return;
 
         // Back changes panels but does not disconnect.
-        ShowStartScreen();
-    }
-
-    // Called by RoomLobbyUI after successfully leaving.
-    public void ReturnToStartScreen()
-    {
-        currentRoomCode = null;
         ShowStartScreen();
     }
 

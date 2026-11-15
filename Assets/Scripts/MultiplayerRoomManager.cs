@@ -29,11 +29,15 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
     private bool isLoadingCity;
     private bool isLoadingEndScene;
     private bool isStartingRoom;
+    private bool soloQuickStart;
 
     public static MultiplayerRoomManager Instance { get; private set; }
     public NetworkRunner Runner => runner;
     public int MaximumPlayers => Mathf.Clamp(maximumPlayers, 1, 4);
-    public int RequiredPlayersCount => Mathf.Clamp(requiredPlayersCount, 1, MaximumPlayers);
+    public int RequiredPlayersCount => soloQuickStart
+        ? 1
+        : Mathf.Clamp(requiredPlayersCount, 1, MaximumPlayers);
+    public bool IsSoloQuickStart => soloQuickStart;
     public string CurrentRoomCode { get; private set; }
     public bool IsConnected => runner != null && runner.IsRunning;
     public int PlayerCount => IsConnected ? runner.ActivePlayers.Count() : 0;
@@ -94,15 +98,20 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
     public Task<bool> CreateRoom(string roomCode)
     {
-        return StartRoom(roomCode, createRoom: true);
+        return StartRoom(roomCode, createRoom: true, quickStartSolo: false);
+    }
+
+    public Task<bool> CreateQuickStartRoom(string roomCode)
+    {
+        return StartRoom(roomCode, createRoom: true, quickStartSolo: true);
     }
 
     public Task<bool> JoinRoom(string roomCode)
     {
-        return StartRoom(roomCode, createRoom: false);
+        return StartRoom(roomCode, createRoom: false, quickStartSolo: false);
     }
 
-    private async Task<bool> StartRoom(string roomCode, bool createRoom)
+    private async Task<bool> StartRoom(string roomCode, bool createRoom, bool quickStartSolo)
     {
         if (runner != null)
         {
@@ -117,6 +126,7 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         roomCode = roomCode.Trim().ToUpperInvariant();
+        soloQuickStart = quickStartSolo;
         GameObject runnerObject = new GameObject("FourSquare NetworkRunner");
         isStartingRoom = true;
 
@@ -243,6 +253,7 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
         NetworkRunner failedRunner = runner;
         runner = null;
         CurrentRoomCode = null;
+        soloQuickStart = false;
 
         if (failedRunner != null && failedRunner.IsRunning)
         {
@@ -305,6 +316,7 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
         runner = null;
         CurrentRoomCode = null;
+        soloQuickStart = false;
         isLoadingCity = false;
         isLoadingEndScene = false;
 
@@ -383,6 +395,7 @@ public class MultiplayerRoomManager : MonoBehaviour, INetworkRunnerCallbacks
 
         runner = null;
         CurrentRoomCode = null;
+        soloQuickStart = false;
         isLoadingCity = false;
         FourSquareFusionSession.Instance?.OnSessionShutdown();
         Debug.LogWarning($"Fusion session shut down: {shutdownReason}.", this);
