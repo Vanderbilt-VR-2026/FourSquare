@@ -37,6 +37,7 @@ public class StartScreenUI : MonoBehaviour
     [SerializeField] private MultiplayerRoomManager multiplayerRoomManager;
 
     private bool isConnecting = false;
+    private Coroutine roomCodeFocusCoroutine;
     private TMP_Text createRoomButtonText;
     private TMP_Text joinRoomConfirmButtonText;
     private string createRoomButtonLabel;
@@ -414,7 +415,28 @@ public class StartScreenUI : MonoBehaviour
         ShowJoinRoomPanel();
 
         if (roomCodeInputField != null)
+        {
             roomCodeInputField.text = "";
+            if (roomCodeFocusCoroutine != null)
+                StopCoroutine(roomCodeFocusCoroutine);
+
+            roomCodeFocusCoroutine =
+                StartCoroutine(FocusRoomCodeInputField());
+        }
+    }
+
+    private IEnumerator FocusRoomCodeInputField()
+    {
+        yield return null;
+
+        roomCodeFocusCoroutine = null;
+        if (joinRoomPanel == null ||
+            !joinRoomPanel.activeInHierarchy ||
+            roomCodeInputField == null)
+            yield break;
+
+        roomCodeInputField.Select();
+        roomCodeInputField.ActivateInputField();
     }
 
     private async void OnJoinRoomConfirmed()

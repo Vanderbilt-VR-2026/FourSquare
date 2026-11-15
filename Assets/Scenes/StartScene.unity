@@ -62004,9 +62004,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KeyboardPosition
   menuCanvas: {fileID: 1893488806}
+  joinRoomPanel: {fileID: 1802392602}
   keyboard: {fileID: 1401051893}
   horizontalOffset: 0
-  verticalOffset: -0.75
+  verticalOffset: 0.75
   forwardOffset: -0.2
 --- !u!114 &1660729399
 MonoBehaviour:
