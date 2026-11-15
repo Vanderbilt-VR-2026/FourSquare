@@ -6,6 +6,9 @@ using Fusion;
 
 public class GameStateManager : MonoBehaviour
 {
+    private const float PlayerTeleportTimeout = 5f;
+    private const float PlayerTeleportPollInterval = 0.1f;
+
     // --- Singleton Pattern ---
     public static GameStateManager Instance { get; private set; }
 
@@ -14,6 +17,7 @@ public class GameStateManager : MonoBehaviour
     public event Action<string, int> OnScoreUpdated;                                   // (PlayerId, NewScore)
     public event Action<SquareRole> OnBallBouncedInSquare;                             // (SquareRole hit)
     public event Action<SquareRole> OnPlayerEliminated;                                // (Eliminated SquareRole)
+    public event Action OnGameStarted;
 
     [Header("Runtime State (Ephemerals)")]
     [SerializeField] private GameObject currentBallCarrier;
@@ -43,6 +47,7 @@ public class GameStateManager : MonoBehaviour
     public bool IsBallInPlay => isBallInPlay;
     public bool HasGameStarted => hasGameStarted;
     public Transform BallSpawnPoint => ballSpawnPoint;
+    public IReadOnlyList<FourSquarePlayer> Players => playerList;
     public GameObject BallPrefab => ballPrefab;
 
     private void Awake()
@@ -318,6 +323,41 @@ public class GameStateManager : MonoBehaviour
             yield return new WaitForSecondsRealtime(ballSpawnDelay);
         }
 
+        FoursquareCourt court = FindFirstObjectByType<FoursquareCourt>();
+        if (court != null)
+            court.TeleportAllPlayersToAssignedQuadrants();
+        else
+            PlayerJoinCourt.TeleportJoinedPlayersToAssignedRoles();
+        if (runner != null)
+        {
+            float waitTime = 0f;
+            FourSquareFusionPlayer[] assignedPlayers =
+                UnityEngine.Object.FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+            while (!PlayerJoinCourt.ArePlayersAtAssignedSquares(assignedPlayers, out int playersNotAtSquare))
+            {
+                if (hasGameStarted || !runner.IsRunning || !runner.IsSharedModeMasterClient)
+                {
+                    isStartingGame = false;
+                    yield break;
+                }
+
+                if (waitTime >= PlayerTeleportTimeout)
+                {
+                    Debug.LogError(
+                        $"Game start cancelled because {playersNotAtSquare} assigned player(s) did not " +
+                        $"reach their court squares within {PlayerTeleportTimeout:F0} seconds. No ball was spawned.",
+                        this);
+                    isStartingGame = false;
+                    yield break;
+                }
+
+                yield return new WaitForSecondsRealtime(PlayerTeleportPollInterval);
+                waitTime += PlayerTeleportPollInterval;
+                assignedPlayers =
+                    UnityEngine.Object.FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+            }
+        }
+
         if (hasGameStarted || (runner != null && (!runner.IsRunning || !runner.IsSharedModeMasterClient)))
         {
             isStartingGame = false;
@@ -431,6 +471,28 @@ public class GameStateManager : MonoBehaviour
         return true;
     }
 
+    public void EnsureSoloPlayerKing()
+    {
+        List<FourSquarePlayer> activeRanking = playerList.FindAll(
+            player => player != null
+                && player.currentRole >= SquareRole.Peasant
+                && player.currentRole <= SquareRole.King);
+        if (activeRanking.Count != 1)
+            return;
+
+        FourSquarePlayer soloPlayer = activeRanking[0];
+        SquareRole oldRole = soloPlayer.currentRole;
+        soloPlayer.currentRole = SquareRole.King;
+        SetNetworkPlayerRole(soloPlayer, SquareRole.King);
+        InitializeDictionary();
+
+        if (oldRole != SquareRole.King)
+        {
+            OnPlayerRoleChanged?.Invoke(soloPlayer, oldRole, SquareRole.King);
+            Debug.Log("[FourSquare] Solo player assigned King rank.", this);
+        }
+    }
+
     public void ApplyNetworkGameStarted()
     {
         if (gameStartEffectsApplied) return;
@@ -460,6 +522,8 @@ public class GameStateManager : MonoBehaviour
             Debug.Log($"[FourSquare] Current rank {rank++}: {networkPlayer.DisplayName} " +
                 $"(ID {networkPlayer.PlayerId}) - {networkPlayer.PlayerRole}.", networkPlayer);
         }
+
+        OnGameStarted?.Invoke();
     }
 
     public void ApplyNetworkBallOut(SquareRole responsibleRole)
@@ -554,10 +618,25 @@ public class GameStateManager : MonoBehaviour
     /// </summary>
     public bool EliminatePlayer(SquareRole eliminatedRole)
     {
-        if (!activePlayers.ContainsKey(eliminatedRole)) return false;
+        if (!activePlayers.TryGetValue(eliminatedRole, out FourSquarePlayer faultPlayer))
+        {
+            Debug.LogWarning(
+                $"[RoleTrace] Elimination ignored: no player currently has role={eliminatedRole}.",
+                this);
+            return false;
+        }
 
-        FourSquarePlayer faultPlayer = activePlayers[eliminatedRole];
+        Debug.LogWarning(
+            $"[RoleTrace] Elimination received: playerId='{faultPlayer.playerId}', " +
+            $"role={eliminatedRole}, gameStarted={hasGameStarted}.",
+            this);
         faultPlayer.eliminationsCount++;
+
+        List<FourSquarePlayer> rankingSnapshot = playerList.FindAll(
+            player => player != null
+                && player.currentRole >= SquareRole.Peasant
+                && player.currentRole <= SquareRole.King);
+        rankingSnapshot.Sort((left, right) => right.currentRole.CompareTo(left.currentRole));
 
         OnPlayerEliminated?.Invoke(eliminatedRole);
 
@@ -565,39 +644,53 @@ public class GameStateManager : MonoBehaviour
         isBallInPlay = false;
         currentBallCarrier = null;
 
-        // If Peasant eliminated, no rank movements happen—Peasant stays Peasant
-        if (eliminatedRole == SquareRole.Peasant)
+        if (rankingSnapshot.Count == 1)
         {
+            SquareRole oldRole = faultPlayer.currentRole;
+            faultPlayer.currentRole = SquareRole.King;
+            SetNetworkPlayerRole(faultPlayer, SquareRole.King);
+            InitializeDictionary();
+            if (oldRole != SquareRole.King)
+                OnPlayerRoleChanged?.Invoke(faultPlayer, oldRole, SquareRole.King);
+            Debug.Log("[FourSquare] Solo player retained King rank after elimination.", this);
             return true;
         }
 
-        RotateRoles(eliminatedRole);
+        // A Peasant is already last in the queue; otherwise promote everyone below the fault.
+        if (eliminatedRole != SquareRole.Peasant)
+            RotateRoles(faultPlayer, rankingSnapshot);
         return true;
     }
 
-    private void RotateRoles(SquareRole faultRole)
+    private void RotateRoles(
+        FourSquarePlayer faultPlayer,
+        List<FourSquarePlayer> rankingSnapshot)
     {
-        FourSquarePlayer faultPlayer = activePlayers[faultRole];
-
-        for (int r = (int)faultRole - 1; r >= (int)SquareRole.Peasant; r--)
+        int nextRole = (int)SquareRole.King;
+        foreach (FourSquarePlayer player in rankingSnapshot)
         {
-            SquareRole currentRole = (SquareRole)r;
-            if (!activePlayers.TryGetValue(currentRole, out FourSquarePlayer promotingPlayer)) continue;
+            if (player == faultPlayer)
+                continue;
 
-            SquareRole nextRole = (SquareRole)(r + 1);
-            promotingPlayer.currentRole = nextRole;
-            SetNetworkPlayerRole(promotingPlayer, nextRole);
+            SquareRole oldRole = player.currentRole;
+            SquareRole newRole = (SquareRole)nextRole--;
+            if (oldRole == newRole)
+                continue;
 
-            OnPlayerRoleChanged?.Invoke(promotingPlayer, currentRole, nextRole);
+            player.currentRole = newRole;
+            SetNetworkPlayerRole(player, newRole);
+            OnPlayerRoleChanged?.Invoke(player, oldRole, newRole);
         }
 
-        // 2. The eliminated player goes straight to Peasant
         SquareRole oldFaultRole = faultPlayer.currentRole;
         faultPlayer.currentRole = SquareRole.Peasant;
-        SetNetworkPlayerRole(faultPlayer, SquareRole.Peasant);
-        OnPlayerRoleChanged?.Invoke(faultPlayer, oldFaultRole, SquareRole.Peasant);
+        Debug.LogWarning(
+            $"[RoleTrace] Moving playerId='{faultPlayer.playerId}' from {oldFaultRole} " +
+            $"to {faultPlayer.currentRole} at the back of the ranking queue.",
+            this);
+        SetNetworkPlayerRole(faultPlayer, faultPlayer.currentRole);
+        OnPlayerRoleChanged?.Invoke(faultPlayer, oldFaultRole, faultPlayer.currentRole);
 
-        // Re-sync dictionary mapping
         InitializeDictionary();
     }
 
