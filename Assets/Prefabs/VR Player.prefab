@@ -298,7 +298,7 @@ MonoBehaviour:
   handColliderRadius: 0.08
   visualCubeSize: 0.12
   handVisualPrefab: {fileID: 0}
-  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  visualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   playerRole: 0
   maximumTrackingSpeed: 8
 --- !u!1 &1324493728189623182
@@ -367,7 +367,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  - {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -514,7 +514,7 @@ MonoBehaviour:
   handColliderRadius: 0.08
   visualCubeSize: 0.12
   handVisualPrefab: {fileID: 0}
-  visualMaterial: {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  visualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   playerRole: 0
   maximumTrackingSpeed: 8
 --- !u!1 &2564747234580309914
@@ -617,7 +617,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  - {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
