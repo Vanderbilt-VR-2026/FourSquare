@@ -106,6 +106,7 @@ GameObject:
   - component: {fileID: 2019485720194857201}
   - component: {fileID: 7869541523813990923}
   - component: {fileID: 8252802612926192540}
+  - component: {fileID: 7311326699817873289}
   m_Layer: 0
   m_Name: Ball
   m_TagString: Untagged
@@ -277,6 +278,7 @@ MonoBehaviour:
   handHitZone: {fileID: 837434839220053229}
   physicalCollider: {fileID: 7396366840077207631}
   networkTransform: {fileID: 2019485720194857201}
+  foursquareBall: {fileID: 0}
   ballAudioSource: {fileID: 8252802612926192540}
   ballHitClip: {fileID: 8300000, guid: 32b98a34476654bb8b5f2c0acd5f92b1, type: 3}
   ballBounceClip: {fileID: 8300000, guid: 231fc67c1780c4ed88af943a6bb0b2dc, type: 3}
@@ -299,7 +301,8 @@ MonoBehaviour:
   directionTurnSpeed: 90
   keyboardHandStrikeKey: 102
   handHitRadius: 0.32
-  minimumHandSpeed: 0.25
+  minimumHandSpeed: 1
+  minimumHandApproachSpeed: 0.2
   hitCooldown: 0.25
 --- !u!82 &8252802612926192540
 AudioSource:
@@ -398,3 +401,16 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &7311326699817873289
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5025608827499203412}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c37fae6b8d4a5c2e9f1b0d7a6c3e8425, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FoursquareBall
+  networkBall: {fileID: 0}

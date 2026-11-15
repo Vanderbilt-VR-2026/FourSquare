@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Test-ball helper that launches a Rigidbody to a target sub-square selected by CourtTargetManager.
@@ -81,6 +82,16 @@ public class BallTrajectoryController : MonoBehaviour
 
     private void Start()
     {
+        if (gameObject.name == "Test Ball" &&
+            SceneManager.GetActiveScene().name == "City" &&
+            FoursquareGameManager.Instance == null)
+        {
+            Debug.LogError(
+                "City Test Ball is still running BallTrajectoryController without Foursquare rules. " +
+                "Run FourSquare > Configure Fusion Gameplay, save City, then enter through the Start Scene lobby.",
+                this);
+        }
+
         ResetBall();
     }
 

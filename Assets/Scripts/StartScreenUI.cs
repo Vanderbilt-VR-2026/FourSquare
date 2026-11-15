@@ -4,11 +4,13 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 
 public class StartScreenUI : MonoBehaviour
 {
     [Header("Buttons")]
     [SerializeField] private Button createRoomButton;
+    [SerializeField] private Button quickStartButton;
     [SerializeField] private Button joinRoomButton;
     [SerializeField] private Button quitButton;
     [SerializeField] private Button createRoomBackButton;
@@ -82,6 +84,9 @@ public class StartScreenUI : MonoBehaviour
                 menuCanvas.gameObject.AddComponent<GraphicRaycaster>();
             }
 
+            if (menuCanvas.GetComponent<TrackedDeviceGraphicRaycaster>() == null)
+                menuCanvas.gameObject.AddComponent<TrackedDeviceGraphicRaycaster>();
+
             Camera eventCamera = playerCamera.GetComponent<Camera>();
 
             if (eventCamera == null)
@@ -134,6 +139,9 @@ public class StartScreenUI : MonoBehaviour
         if (createRoomButton != null)
             createRoomButton.onClick.AddListener(OnCreateRoomClicked);
 
+        if (quickStartButton != null)
+            quickStartButton.onClick.AddListener(OnQuickStartClicked);
+
         if (joinRoomButton != null)
             joinRoomButton.onClick.AddListener(OnJoinRoomClicked);
 
@@ -161,6 +169,9 @@ public class StartScreenUI : MonoBehaviour
     {
         if (createRoomButton != null)
             createRoomButton.onClick.RemoveListener(OnCreateRoomClicked);
+
+        if (quickStartButton != null)
+            quickStartButton.onClick.RemoveListener(OnQuickStartClicked);
 
         if (joinRoomButton != null)
             joinRoomButton.onClick.RemoveListener(OnJoinRoomClicked);
@@ -248,6 +259,7 @@ public class StartScreenUI : MonoBehaviour
 
         if (roomLobbyPanel != null)
         {
+            CenterMenuInFrontOfPlayer(HasTrackedHeadPose());
             roomLobbyPanel.SetActive(true);
             Debug.Log("[FourSquare] Multiplayer lobby opened.");
         }
@@ -428,6 +440,57 @@ public class StartScreenUI : MonoBehaviour
 
             if (createRoomButton != null)
                 createRoomButton.interactable = true;
+        }
+    }
+
+    private async void OnQuickStartClicked()
+    {
+        if (isConnecting)
+            return;
+
+        if (roomCodeManager == null || multiplayerRoomManager == null)
+        {
+            Debug.LogError(
+                "Quick Start requires RoomCodeManager and MultiplayerRoomManager references.",
+                this);
+            return;
+        }
+
+        if (multiplayerRoomManager.IsConnected)
+        {
+            currentRoomCode = multiplayerRoomManager.CurrentRoomCode;
+            ShowLobby();
+            return;
+        }
+
+        isConnecting = true;
+        if (quickStartButton != null)
+            quickStartButton.interactable = false;
+
+        try
+        {
+            string code = roomCodeManager.CreateUniqueRoomCode();
+            DisplayRoomCode(code);
+            bool success = await multiplayerRoomManager.CreateQuickStartRoom(code);
+            if (!success)
+            {
+                Debug.LogError($"Quick Start could not create lobby '{code}'.", this);
+                return;
+            }
+
+            currentRoomCode = code;
+            ShowLobby();
+            Debug.Log($"Quick Start lobby '{code}' created; City will start with one player.", this);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception, this);
+        }
+        finally
+        {
+            isConnecting = false;
+            if (quickStartButton != null)
+                quickStartButton.interactable = true;
         }
     }
 

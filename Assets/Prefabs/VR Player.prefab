@@ -130,6 +130,9 @@ MonoBehaviour:
   head: {fileID: 5534698580290380372}
   leftHand: {fileID: 687757885639206756}
   rightHand: {fileID: 9134842610072369237}
+  nameplatePrefab: {fileID: 0}
+  nameplateOffset: {x: 0, y: 0.3, z: 0}
+  showLocalNameplate: 0
   avatarRenderers:
   - {fileID: 4297574636729099772}
   - {fileID: 3697404328519084993}
@@ -160,6 +163,7 @@ MonoBehaviour:
   playerId: 
   startingRole: 0
   triggerAction: {fileID: -6131295136447488360, guid: c348712bda248c246b8c49b3db54643f, type: 3}
+  _NetworkRole: 0
 --- !u!1 &1094145138487326133
 GameObject:
   m_ObjectHideFlags: 0
