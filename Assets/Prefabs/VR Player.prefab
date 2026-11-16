@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 350774810742917943}
   - component: {fileID: 9188102631058289230}
   - component: {fileID: 979321705808114926}
+  - component: {fileID: 683000000000000000}
   m_Layer: 0
   m_Name: VR Player
   m_TagString: Player
@@ -132,14 +133,10 @@ MonoBehaviour:
   head: {fileID: 5534698580290380372}
   leftHand: {fileID: 687757885639206756}
   rightHand: {fileID: 9134842610072369237}
-  nameplatePrefab: {fileID: 0}
-  nameplateOffset: {x: 0, y: 0.3, z: 0}
-  showLocalNameplate: 0
   avatarRenderers:
   - {fileID: 4297574636729099772}
   - {fileID: 3697404328519084993}
   showLocalAvatar: 0
-  headVisualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   _NetworkRootPosition: {x: 0, y: 0, z: 0}
   _NetworkRootRotation: {x: 0, y: 0, z: 0, w: 0}
   _NetworkHeadPosition: {x: 0, y: 0, z: 0}
@@ -166,6 +163,20 @@ MonoBehaviour:
   startingRole: 0
   triggerAction: {fileID: -6131295136447488360, guid: c348712bda248c246b8c49b3db54643f, type: 3}
   _NetworkRole: 0
+--- !u!114 &683000000000000000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 992349184629936267}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 683a288200a04b7ea9385d8dc7242263, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  tagPrefab: {fileID: 1000000000000000000, guid: 9b7e0f0d7b4e4a9e9a1f2c3d4e5f6071, type: 3}
+  heightAboveHead: 0.35
 --- !u!1 &1094145138487326133
 GameObject:
   m_ObjectHideFlags: 0
@@ -291,6 +302,7 @@ MonoBehaviour:
   handVisualPrefab: {fileID: 0}
   visualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   playerRole: 0
+  maximumTrackingSpeed: 8
 --- !u!1 &1324493728189623182
 GameObject:
   m_ObjectHideFlags: 0
@@ -357,7 +369,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  - {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -506,6 +518,7 @@ MonoBehaviour:
   handVisualPrefab: {fileID: 0}
   visualMaterial: {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   playerRole: 0
+  maximumTrackingSpeed: 8
 --- !u!1 &2564747234580309914
 GameObject:
   m_ObjectHideFlags: 0
@@ -606,7 +619,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 107887ab060f4ff48b4b1547a8130bcc, type: 2}
+  - {fileID: 2100000, guid: 7a11c5c58b1f4ad8b32e72eac3d8f901, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

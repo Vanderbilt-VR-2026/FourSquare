@@ -1,9 +1,6 @@
-using System.Collections;
-using System.Collections.Generic;
 using Fusion;
 using UnityEngine;
 using Unity.XR.CoreUtils;
-using TMPro;
 #if UNITY_EDITOR
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Simulation;
 #endif
@@ -17,15 +14,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [SerializeField] private Transform leftHand;
     [SerializeField] private Transform rightHand;
 
-    [Header("Nameplate")]
-    [SerializeField] private PlayerNameplate nameplatePrefab;
-    [SerializeField] private Vector3 nameplateOffset = new Vector3(0f, 0.3f, 0f);
-    [SerializeField] private bool showLocalNameplate;
-
     [Header("Remote Rig")]
     [SerializeField] private Renderer[] avatarRenderers;
     [SerializeField] private bool showLocalAvatar;
-    [SerializeField] private Material headVisualMaterial;
 
     [Networked] public Vector3 NetworkRootPosition { get; set; }
     [Networked] public Quaternion NetworkRootRotation { get; set; }
@@ -69,14 +60,10 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private BallHandMarker[] handMarkers;
     private Collider[] bodyColliders;
-    private UnityEngine.Behaviour[] locomotionProviders;
-    private bool[] locomotionProviderInitiallyEnabled;
     private Camera rigCamera;
     private Renderer squareHeadRenderer;
+    private Material squareHeadMaterial;
     private int lastAppliedRole = int.MinValue;
-    private bool movementLockApplied;
-    private bool movementLocked;
-    private int activeTeleportLocks;
     private bool HasLocalAuthority =>
         Object != null
         && Object.IsValid
@@ -104,7 +91,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         rigCamera = head != null ? head.GetComponent<Camera>() : GetComponentInChildren<Camera>(true);
         handMarkers = GetComponentsInChildren<BallHandMarker>(true);
         bodyColliders = GetComponents<Collider>();
-        CacheLocomotionProviders();
+        if (GetComponent<PlayerNameTag>() == null)
+            gameObject.AddComponent<PlayerNameTag>();
     }
 
     private void CreateSquareHead()
@@ -128,20 +116,20 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         squareHeadRenderer = headObject.GetComponent<Renderer>();
         squareHeadRenderer.enabled = false;
 
-        if (headVisualMaterial == null
-            || headVisualMaterial.shader == null
-            || !headVisualMaterial.shader.isSupported
-            || headVisualMaterial.shader.name != "Universal Render Pipeline/Unlit")
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Unlit/Color");
+        if (shader == null) shader = Shader.Find("Standard");
+        if (shader == null)
         {
-            squareHeadRenderer.enabled = false;
-            Debug.LogError("Assign a supported URP Unlit material for the placeholder square head.", this);
+            Debug.LogError("Could not find a shader for the placeholder square head.", this);
             return;
         }
 
-        squareHeadRenderer.sharedMaterial = headVisualMaterial;
-        MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
-        propertyBlock.SetColor("_BaseColor", new Color(0.95f, 0.75f, 0.35f, 1f));
-        squareHeadRenderer.SetPropertyBlock(propertyBlock);
+        squareHeadMaterial = new Material(shader)
+        {
+            color = new Color(0.95f, 0.75f, 0.35f, 1f)
+        };
+        squareHeadRenderer.sharedMaterial = squareHeadMaterial;
     }
 
     public override void Spawned()
@@ -162,9 +150,6 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
 
         ConfigureRigForAuthority();
-        UpdateGameplayMovementLock(force: true);
-        ApplyBallBodyCollisionFilter();
-        CreateNameplate();
         if (HasLocalAuthority)
             CreateCityLobbyDisplay();
         GameStateManager.Instance?.RegisterNetworkPlayer(this);
@@ -220,29 +205,20 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         if (!System.Enum.IsDefined(typeof(SquareRole), role) || role == SquareRole.Spectator) return;
 
-        bool hasStateAuthority = Object != null && Object.IsValid && Object.HasStateAuthority;
-        Debug.Log(
-            $"[RoleTrace] RequestRole playerId='{PlayerId}', current={PlayerRole}, requested={role}, " +
-            $"stateAuthority={hasStateAuthority}.",
-            this);
-
         if (Object == null || !Object.IsValid)
         {
             NetworkRole = (int)role;
-            Debug.Log($"[RoleTrace] Applied local role playerId='{PlayerId}', role={PlayerRole}.", this);
             return;
         }
 
-        if (hasStateAuthority)
+        if (Object.HasStateAuthority)
         {
             NetworkRole = (int)role;
             ApplyRoleToLocalRig(role);
-            Debug.Log($"[RoleTrace] Applied network role playerId='{PlayerId}', role={PlayerRole}.", this);
         }
         else
         {
             RPC_SetRole((int)role);
-            Debug.Log($"[RoleTrace] Sent role request playerId='{PlayerId}', requested={role}.", this);
         }
     }
 
@@ -255,15 +231,6 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
 
         RPC_RequestGameStart();
-    }
-
-    [Rpc(RpcSources.All, RpcTargets.All)]
-    public void RPC_RequestGameStart()
-    {
-        if (Runner != null && Runner.IsSharedModeMasterClient)
-        {
-            GameStateManager.Instance?.StartGameAsAuthority(Runner);
-        }
     }
 
     public void IgnoreBallBodyCollision(NetworkBallController networkBall)
@@ -286,12 +253,10 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         if (!HasLocalAuthority || xrOrigin == null)
             return;
 
-        activeTeleportLocks++;
-        UpdateGameplayMovementLock(force: true);
-
         CharacterController characterController = xrOrigin.GetComponent<CharacterController>();
-        bool characterControllerWasEnabled = characterController != null && characterController.enabled;
-        bool teleportApplied = false;
+        bool characterControllerWasEnabled =
+            characterController != null && characterController.enabled;
+
         try
         {
             if (characterController != null)
@@ -299,36 +264,21 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
             xrOrigin.transform.SetPositionAndRotation(position, rotation);
             Physics.SyncTransforms();
-            teleportApplied = true;
         }
         finally
         {
             if (characterController != null)
                 characterController.enabled = characterControllerWasEnabled;
-
-            if (teleportApplied)
-                StartCoroutine(ReleaseTeleportMovementLock());
-            else
-            {
-                activeTeleportLocks--;
-                UpdateGameplayMovementLock(force: true);
-            }
         }
     }
 
-    private IEnumerator ReleaseTeleportMovementLock()
+    [Rpc(RpcSources.All, RpcTargets.All)]
+    public void RPC_RequestGameStart()
     {
-        yield return new WaitForFixedUpdate();
-        activeTeleportLocks = Mathf.Max(0, activeTeleportLocks - 1);
-        UpdateGameplayMovementLock(force: true);
-    }
-
-    private void ApplyBallBodyCollisionFilter()
-    {
-        NetworkBallController[] networkBalls =
-            FindObjectsByType<NetworkBallController>(FindObjectsSortMode.None);
-        foreach (NetworkBallController networkBall in networkBalls)
-            IgnoreBallBodyCollision(networkBall);
+        if (Runner != null && Runner.IsSharedModeMasterClient)
+        {
+            GameStateManager.Instance?.StartGameAsAuthority(Runner);
+        }
     }
 
     [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
@@ -336,12 +286,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     {
         if (System.Enum.IsDefined(typeof(SquareRole), role) && role != (int)SquareRole.Spectator)
         {
-            SquareRole oldRole = PlayerRole;
             NetworkRole = role;
             ApplyRoleToLocalRig((SquareRole)role);
-            Debug.Log(
-                $"[RoleTrace] RPC applied playerId='{PlayerId}', oldRole={oldRole}, newRole={PlayerRole}.",
-                this);
         }
     }
 
@@ -367,13 +313,17 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         foreach (UnityEngine.Behaviour behaviour in GetComponentsInChildren<UnityEngine.Behaviour>(true))
         {
-            if (behaviour == this || behaviour is XROrigin || behaviour is Camera || behaviour is AudioListener)
+            if (behaviour == this || behaviour is PlayerNameTag
+                || behaviour.GetComponentInParent<PlayerNameTag>() != null
+                || behaviour is XROrigin || behaviour is Camera || behaviour is AudioListener)
             {
                 continue;
             }
 
             string typeName = behaviour.GetType().Name;
-            if (typeName == "TrackedPoseDriver")
+            if (typeName == "TrackedPoseDriver"
+                || typeName == "ContinuousMoveProvider" || typeName == "SnapTurnProvider"
+                || typeName == "ContinuousTurnProvider" || typeName == "LocomotionMediator")
             {
                 behaviour.enabled = isLocal;
             }
@@ -385,10 +335,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         {
             if (avatarRenderer == null) continue;
 
-            if (avatarRenderer.GetComponentInParent<BallHandMarker>() != null)
-                continue;
-
-            avatarRenderer.enabled = renderAvatar;
+            bool isHandVisual = avatarRenderer.GetComponentInParent<BallHandMarker>() != null;
+            avatarRenderer.enabled = (isHandVisual && showTrackedHands) || renderAvatar;
         }
 
         foreach (BallHandMarker handMarker in handMarkers)
@@ -402,38 +350,15 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
     }
 
-    private void CreateNameplate()
+    private void Update()
     {
-        if (head == null)
-        {
-            Debug.LogError("Cannot create player nameplate because the XR head transform is not assigned.", this);
-            return;
-        }
+        if (Object == null || !Object.IsValid || !HasLocalAuthority) return;
 
-        PlayerNameplate nameplate;
-        if (nameplatePrefab != null)
+        bool showTrackedHands = HasXRTracking();
+        foreach (BallHandMarker handMarker in handMarkers)
         {
-            nameplate = Instantiate(nameplatePrefab);
+            if (handMarker != null) handMarker.SetTrackingActive(showTrackedHands);
         }
-        else
-        {
-            GameObject nameplateObject = new GameObject("Runtime Player Nameplate");
-            TextMeshPro runtimeText = nameplateObject.AddComponent<TextMeshPro>();
-            runtimeText.fontSize = 4f;
-            runtimeText.alignment = TextAlignmentOptions.Center;
-            nameplateObject.transform.localScale = Vector3.one * 0.01f;
-            nameplate = nameplateObject.AddComponent<PlayerNameplate>();
-            Debug.LogWarning(
-                "No nameplate prefab is assigned; using a basic runtime TextMeshPro nameplate.",
-                this);
-        }
-
-        nameplate.Initialize(
-            head,
-            DisplayName,
-            HasLocalAuthority ? rigCamera : Camera.main,
-            nameplateOffset,
-            HasLocalAuthority && !showLocalNameplate);
     }
 
     private void CreateCityLobbyDisplay()
@@ -449,75 +374,6 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         GameObject displayObject = new GameObject("City Lobby Status");
         CityLobbyDisplay display = displayObject.AddComponent<CityLobbyDisplay>();
         display.Initialize(head, rigCamera);
-    }
-
-    private void Update()
-    {
-        if (Object == null || !Object.IsValid || !HasLocalAuthority) return;
-
-        UpdateGameplayMovementLock();
-
-        bool showTrackedHands = HasXRTracking();
-        foreach (BallHandMarker handMarker in handMarkers)
-        {
-            if (handMarker != null) handMarker.SetTrackingActive(showTrackedHands);
-        }
-    }
-
-    private void CacheLocomotionProviders()
-    {
-        List<UnityEngine.Behaviour> providers = new List<UnityEngine.Behaviour>();
-        List<bool> initiallyEnabled = new List<bool>();
-        UnityEngine.Behaviour[] behaviours = GetComponentsInChildren<UnityEngine.Behaviour>(true);
-        foreach (UnityEngine.Behaviour behaviour in behaviours)
-        {
-            if (behaviour == null || !IsLocomotionProvider(behaviour.GetType().Name))
-                continue;
-
-            providers.Add(behaviour);
-            initiallyEnabled.Add(behaviour.enabled);
-        }
-
-        locomotionProviders = providers.ToArray();
-        locomotionProviderInitiallyEnabled = initiallyEnabled.ToArray();
-    }
-
-    private void UpdateGameplayMovementLock(bool force = false)
-    {
-        FoursquareGameManager gameManager = FoursquareGameManager.Instance;
-        bool gameInProgress = gameManager != null
-            ? gameManager.CurrentState != FoursquareGameState.WaitingToStart
-            : GameStateManager.Instance != null && GameStateManager.Instance.HasGameStarted;
-        bool shouldLockMovement = gameInProgress || activeTeleportLocks > 0;
-
-        if (!force && movementLockApplied && movementLocked == shouldLockMovement)
-            return;
-
-        movementLocked = shouldLockMovement;
-        movementLockApplied = true;
-
-        if (locomotionProviders == null)
-            CacheLocomotionProviders();
-
-        for (int i = 0; i < locomotionProviders.Length; i++)
-        {
-            UnityEngine.Behaviour provider = locomotionProviders[i];
-            if (provider == null)
-                continue;
-
-            bool wasEnabled = i < locomotionProviderInitiallyEnabled.Length &&
-                              locomotionProviderInitiallyEnabled[i];
-            provider.enabled = HasLocalAuthority && wasEnabled && !movementLocked;
-        }
-    }
-
-    private static bool IsLocomotionProvider(string typeName)
-    {
-        return typeName == "ContinuousMoveProvider" ||
-               typeName == "SnapTurnProvider" ||
-               typeName == "ContinuousTurnProvider" ||
-               typeName == "TeleportationProvider" ||
-               typeName == "ClimbProvider";
     }
 
     private static bool HasXRTracking()
@@ -550,7 +406,6 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             if (marker != null) marker.SetPlayerRole(role);
         }
 
-        ApplyRoleToLocalRig(role);
         GameStateManager.Instance?.UpdateNetworkPlayerRole(this);
     }
 
@@ -569,4 +424,11 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         return null;
     }
 
+    private void OnDestroy()
+    {
+        if (squareHeadMaterial != null)
+        {
+            Destroy(squareHeadMaterial);
+        }
+    }
 }

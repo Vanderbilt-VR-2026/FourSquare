@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class EndScreenUI : MonoBehaviour
@@ -42,8 +43,8 @@ public class EndScreenUI : MonoBehaviour
 
     private void OnEnable()
     {
-        // if (playAgainButton != null)
-        //     playAgainButton.onClick.AddListener(OnPlayAgainClicked);
+        if (playAgainButton != null)
+            playAgainButton.onClick.AddListener(OnPlayAgainClicked);
 
         if (quitButton != null)
             quitButton.onClick.AddListener(OnQuitClicked);
@@ -52,8 +53,8 @@ public class EndScreenUI : MonoBehaviour
 
     private void OnDisable()
     {
-        // if (playAgainButton != null)
-        //     playAgainButton.onClick.RemoveListener(OnPlayAgainClicked);
+        if (playAgainButton != null)
+            playAgainButton.onClick.RemoveListener(OnPlayAgainClicked);
 
         if (quitButton != null)
             quitButton.onClick.RemoveListener(OnQuitClicked);
@@ -105,9 +106,14 @@ public class EndScreenUI : MonoBehaviour
         );
     }
 
-    // private void OnPlayAgainClicked()
-    // {
-    // }
+    private async void OnPlayAgainClicked()
+    {
+        MultiplayerRoomManager roomManager = MultiplayerRoomManager.Instance;
+        if (roomManager != null)
+            await roomManager.LeaveRoom();
+
+        SceneManager.LoadScene("StartScene");
+    }
 
     private void OnQuitClicked()
     {
