@@ -21,6 +21,7 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
 
     [Header("Network Prefabs")]
     [SerializeField] private NetworkObject playerPrefab;
+    [SerializeField] private Transform joinSpawnsRoot;
     [SerializeField] private Transform playerSpawnPoint;
 
     private NetworkRunner runner;
@@ -291,14 +292,23 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
     {
         Unity.XR.CoreUtils.XROrigin[] existingRigs =
             FindObjectsByType<Unity.XR.CoreUtils.XROrigin>(FindObjectsSortMode.None);
-        position = playerSpawnPoint != null ? playerSpawnPoint.position : transform.position;
-        rotation = playerSpawnPoint != null ? playerSpawnPoint.rotation : transform.rotation;
+        Transform joinSpawn = GetJoinSpawn();
+        if (joinSpawn != null)
+        {
+            position = joinSpawn.position;
+            rotation = joinSpawn.rotation;
+        }
+        else
+        {
+            position = playerSpawnPoint != null ? playerSpawnPoint.position : transform.position;
+            rotation = playerSpawnPoint != null ? playerSpawnPoint.rotation : transform.rotation;
+        }
 
-        if (playerSpawnPoint == null)
+        if (joinSpawn == null && playerSpawnPoint == null)
         {
             Debug.LogWarning(
-                "No player spawn point is assigned. The VR Player will spawn at the Fusion session object's position. " +
-                "Assign Player Spawn Point in the City scene.",
+                "No join spawn point is assigned. The VR Player will spawn at the Fusion session object's position. " +
+                "Assign Join Spawns in the City scene.",
                 this);
         }
 
@@ -306,6 +316,34 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
         {
             rig.gameObject.SetActive(false);
         }
+    }
+
+    private Transform GetJoinSpawn()
+    {
+        if (joinSpawnsRoot == null)
+        {
+            Debug.LogError(
+                "Join Spawns is not assigned. The VR Player cannot be placed by join order.",
+                this);
+            return null;
+        }
+
+        int playerNumber = runner != null ? runner.LocalPlayer.PlayerId : 0;
+        if (playerNumber < 1)
+        {
+            Debug.LogError("The local Fusion player has no valid join-order ID.", this);
+            return null;
+        }
+
+        Transform spawn = joinSpawnsRoot.Find($"Player{playerNumber}");
+        if (spawn == null)
+        {
+            Debug.LogError(
+                $"Join Spawns is missing a Player{playerNumber} child for the local Fusion player.",
+                joinSpawnsRoot);
+        }
+
+        return spawn;
     }
 
     private void OnDestroy()
