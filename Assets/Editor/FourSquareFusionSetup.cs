@@ -143,6 +143,8 @@ public static class FourSquareFusionSetup
             GameObject playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
             serializedSession.FindProperty("playerPrefab").objectReferenceValue =
                 playerPrefab != null ? playerPrefab.GetComponent<NetworkObject>() : null;
+            Transform joinSpawnsRoot = FindTransform(cityScene, "JoinSpawns");
+            serializedSession.FindProperty("joinSpawnsRoot").objectReferenceValue = joinSpawnsRoot;
             Transform playerSpawnPoint = GetOrCreatePlayerSpawnPoint(cityScene, managerObject.transform);
             serializedSession.FindProperty("playerSpawnPoint").objectReferenceValue = playerSpawnPoint;
             serializedSession.ApplyModifiedPropertiesWithoutUndo();
