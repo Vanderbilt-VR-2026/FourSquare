@@ -5,6 +5,7 @@ using UnityEngine;
 public sealed class PlayerNameplate : MonoBehaviour
 {
     [SerializeField] private TMP_Text label;
+    [SerializeField, Min(0.1f)] private float billboardTurnSpeed = 12f;
 
     private Camera viewCamera;
 
@@ -49,8 +50,12 @@ public sealed class PlayerNameplate : MonoBehaviour
         if (viewCamera == null)
             return;
 
-        Vector3 towardNameplate = transform.position - viewCamera.transform.position;
-        if (towardNameplate.sqrMagnitude > 0.0001f)
-            transform.rotation = Quaternion.LookRotation(towardNameplate, Vector3.up);
+        Vector3 towardViewer = viewCamera.transform.position - transform.position;
+        if (towardViewer.sqrMagnitude <= 0.0001f)
+            return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(towardViewer, Vector3.up);
+        float blend = 1f - Mathf.Exp(-billboardTurnSpeed * Time.deltaTime);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, blend);
     }
 }

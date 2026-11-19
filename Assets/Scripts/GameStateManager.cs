@@ -495,35 +495,54 @@ public class GameStateManager : MonoBehaviour
 
     public void ApplyNetworkGameStarted()
     {
-        if (gameStartEffectsApplied) return;
+        ApplyNetworkGameState(true);
+    }
 
-        hasGameStarted = true;
-        gameStartEffectsApplied = true;
-        isBallInPlay = true;
-        currentBallCarrier = null;
-        lastTouchedByPlayerRole = SquareRole.King;
-        lastSquareHit = SquareRole.Spectator;
-        PlayerJoinCourt.OnGameStarted();
-        PlayerJoinCourt.RefreshJoinZoneAuras();
-
-        Debug.Log($"[FourSquare] Game started. Players in ranking: {playerList.Count}.", this);
-        FourSquareFusionPlayer[] rankedPlayers =
-            UnityEngine.Object.FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
-        Array.Sort(rankedPlayers, (left, right) =>
+    public void ApplyNetworkGameState(bool started)
+    {
+        if (started)
         {
-            int roleComparison = right.NetworkRole.CompareTo(left.NetworkRole);
-            return roleComparison != 0 ? roleComparison : left.JoinOrder.CompareTo(right.JoinOrder);
-        });
-        int rank = 1;
-        foreach (FourSquareFusionPlayer networkPlayer in rankedPlayers)
-        {
-            if (networkPlayer.PlayerRole == SquareRole.Spectator) continue;
+            if (gameStartEffectsApplied) return;
 
-            Debug.Log($"[FourSquare] Current rank {rank++}: {networkPlayer.DisplayName} " +
-                $"(ID {networkPlayer.PlayerId}) - {networkPlayer.PlayerRole}.", networkPlayer);
+            hasGameStarted = true;
+            gameStartEffectsApplied = true;
+            isBallInPlay = true;
+            currentBallCarrier = null;
+            lastTouchedByPlayerRole = SquareRole.King;
+            lastSquareHit = SquareRole.Spectator;
+            PlayerJoinCourt.OnGameStarted();
+            PlayerJoinCourt.RefreshJoinZoneAuras();
+
+            Debug.Log($"[FourSquare] Game started. Players in ranking: {playerList.Count}.", this);
+            FourSquareFusionPlayer[] rankedPlayers =
+                UnityEngine.Object.FindObjectsByType<FourSquareFusionPlayer>(FindObjectsSortMode.None);
+            Array.Sort(rankedPlayers, (left, right) =>
+            {
+                int roleComparison = right.NetworkRole.CompareTo(left.NetworkRole);
+                return roleComparison != 0 ? roleComparison : left.JoinOrder.CompareTo(right.JoinOrder);
+            });
+            int rank = 1;
+            foreach (FourSquareFusionPlayer networkPlayer in rankedPlayers)
+            {
+                if (networkPlayer.PlayerRole == SquareRole.Spectator) continue;
+
+                Debug.Log($"[FourSquare] Current rank {rank++}: {networkPlayer.DisplayName} " +
+                    $"(ID {networkPlayer.PlayerId}) - {networkPlayer.PlayerRole}.", networkPlayer);
+            }
+
+            OnGameStarted?.Invoke();
+            return;
         }
 
-        OnGameStarted?.Invoke();
+        if (!hasGameStarted && !gameStartEffectsApplied) return;
+
+        hasGameStarted = false;
+        gameStartEffectsApplied = false;
+        isBallInPlay = false;
+        currentBallCarrier = null;
+        lastTouchedByPlayerRole = SquareRole.Spectator;
+        lastSquareHit = SquareRole.Spectator;
+        PlayerJoinCourt.RefreshJoinZoneAuras();
     }
 
     public void ApplyNetworkBallOut(SquareRole responsibleRole)

@@ -18,6 +18,8 @@ public class NetworkBallController : NetworkBehaviour
 {
     public static NetworkBallController Instance { get; private set; }
 
+    [Networked] public NetworkBool NetworkGameStarted { get; set; }
+
     [Header("Court & Physics References")]
     [SerializeField] private CourtTargetManager courtTargetManager;
     [SerializeField] private Rigidbody ballRigidbody;
@@ -63,6 +65,8 @@ public class NetworkBallController : NetworkBehaviour
     private Vector3 preServePosition;
     private float preServeStartTime;
     private float lastBounceSoundTime = -100f;
+    private bool hasAppliedGameStartedState;
+    private bool lastAppliedGameStartedState;
 
     [Header("Trajectory Arc & Bounce")]
     [Tooltip("Peak height of the arc above launch point.")]
@@ -102,11 +106,40 @@ public class NetworkBallController : NetworkBehaviour
             return false;
 
         ResetBall();
-        GameStateManager.Instance?.ApplyNetworkGameStarted();
-        FoursquareGameManager.Instance?.ApplyNetworkState((int)FoursquareGameState.WaitingToServe);
-        if (IsNetworked)
-            RPC_NotifyGamePhase((int)FoursquareGameState.WaitingToServe);
+        SetGameStarted(true);
         return true;
+    }
+
+    public void SetGameStarted(bool started)
+    {
+        if (IsNetworked && !HasGameplayAuthority)
+        {
+            RPC_RequestGameStarted(started);
+            return;
+        }
+
+        if (IsNetworked)
+            NetworkGameStarted = started;
+
+        GameStateManager.Instance?.ApplyNetworkGameState(started);
+        if (started)
+            FoursquareGameManager.Instance?.ApplyNetworkState((int)FoursquareGameState.WaitingToServe);
+        else
+            FoursquareGameManager.Instance?.ApplyNetworkState((int)FoursquareGameState.WaitingToStart);
+
+        if (IsNetworked)
+        {
+            RPC_NotifyGamePhase((int)(started
+                ? FoursquareGameState.WaitingToServe
+                : FoursquareGameState.WaitingToStart));
+        }
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    private void RPC_RequestGameStarted(NetworkBool started)
+    {
+        if (HasGameplayAuthority)
+            SetGameStarted(started);
     }
 
     private void Awake()
@@ -146,6 +179,23 @@ public class NetworkBallController : NetworkBehaviour
         {
             ResetBall();
         }
+    }
+
+    public override void Render()
+    {
+        GameStateManager manager = GameStateManager.Instance;
+        if (manager == null)
+            return;
+
+        bool gameStarted = NetworkGameStarted;
+        if (hasAppliedGameStartedState && lastAppliedGameStartedState == gameStarted)
+            return;
+
+        hasAppliedGameStartedState = true;
+        lastAppliedGameStartedState = gameStarted;
+        manager.ApplyNetworkGameState(gameStarted);
+        if (!gameStarted)
+            FoursquareGameManager.Instance?.ApplyNetworkState((int)FoursquareGameState.WaitingToStart);
     }
 
     public void IgnorePlayerBodyCollision(Collider bodyCollider)
@@ -615,12 +665,18 @@ public class NetworkBallController : NetworkBehaviour
     public void RPC_NotifyGamePhase(int stateValue)
     {
         if (Object != null && Object.IsValid && Object.HasStateAuthority)
+        {
+            if (System.Enum.IsDefined(typeof(FoursquareGameState), stateValue))
+                NetworkGameStarted = stateValue != (int)FoursquareGameState.WaitingToStart;
             return;
+        }
 
         FoursquareGameManager.Instance?.ApplyNetworkState(stateValue);
         if (stateValue == (int)FoursquareGameState.Playing ||
             stateValue == (int)FoursquareGameState.WaitingToServe)
-            GameStateManager.Instance?.ApplyNetworkGameStarted();
+            GameStateManager.Instance?.ApplyNetworkGameState(true);
+        else if (stateValue == (int)FoursquareGameState.WaitingToStart)
+            GameStateManager.Instance?.ApplyNetworkGameState(false);
     }
 
     private static bool IsPlayerAuthorizedForRole(PlayerRef source, SquareRole role)

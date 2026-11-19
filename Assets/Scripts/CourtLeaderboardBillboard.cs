@@ -55,6 +55,21 @@ public class CourtLeaderboardBillboard : MonoBehaviour
         CreateBoard();
     }
 
+    private static bool IsGameStarted()
+    {
+        GameStateManager manager = GameStateManager.Instance;
+        return manager != null && manager.HasGameStarted;
+    }
+
+    private void ApplyLeaderboardVisibility(bool gameStarted)
+    {
+        bool showTopBoard = !gameStarted;
+        if (boardTransform != null && boardTransform.gameObject.activeSelf != showTopBoard)
+            boardTransform.gameObject.SetActive(showTopBoard);
+        if (sideBoardTransform != null && sideBoardTransform.gameObject.activeSelf != gameStarted)
+            sideBoardTransform.gameObject.SetActive(gameStarted);
+    }
+
     public static Transform GetBoardAnchor(Transform owner, BoxCollider bounds)
     {
         return bounds != null && bounds.transform.parent != null
@@ -112,8 +127,7 @@ public class CourtLeaderboardBillboard : MonoBehaviour
 
     private void OnEnable()
     {
-        if (boardTransform != null) boardTransform.gameObject.SetActive(true);
-        if (sideBoardTransform != null) sideBoardTransform.gameObject.SetActive(true);
+        ApplyLeaderboardVisibility(IsGameStarted());
     }
 
     private void OnDisable()
@@ -133,12 +147,14 @@ public class CourtLeaderboardBillboard : MonoBehaviour
         GameStateManager manager = GameStateManager.Instance;
         if (manager == null)
         {
+            ApplyLeaderboardVisibility(false);
             SetRosterAlignment(TextAnchor.MiddleCenter);
             SetRosterText("WAITING FOR PLAYERS", WaitingFontSize);
             return;
         }
 
         bool gameStarted = manager.HasGameStarted;
+        ApplyLeaderboardVisibility(gameStarted);
         if (gameStarted && !previousGameStarted)
         {
             roleTimers.Clear();
@@ -414,6 +430,8 @@ public class CourtLeaderboardBillboard : MonoBehaviour
             rosterTexts.Add(sideRosterText);
             ApplySideBoardPose();
         }
+
+        ApplyLeaderboardVisibility(IsGameStarted());
     }
 
     private GameObject CreateBoardCanvas(string objectName, out Text boardRosterText)

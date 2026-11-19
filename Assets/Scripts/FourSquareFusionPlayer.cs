@@ -28,6 +28,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     [Networked] public Quaternion NetworkRightHandRotation { get; set; }
     [Networked] public bool NetworkHasXRTracking { get; set; }
     [Networked] public int NetworkRole { get; set; }
+    [Networked] public int NetworkPlayerNumber { get; set; }
 
     public bool IsLocallyOwned => HasLocalAuthority;
     public bool HasPlayerAuthority => PlayerAuthority != PlayerRef.None;
@@ -54,8 +55,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         ? (SquareRole)NetworkRole
         : SquareRole.Spectator;
     public string PlayerId => HasPlayerAuthority ? PlayerAuthority.ToString() : string.Empty;
-    public string DisplayName => Object != null && Object.IsValid
-        ? $"Player {PlayerAuthority.PlayerId}"
+    public string DisplayName => HasPlayerAuthority
+        ? $"Player {(NetworkPlayerNumber != 0 ? NetworkPlayerNumber : PlayerAuthority.PlayerId)}"
         : "Unknown Player";
 
     private BallHandMarker[] handMarkers;
@@ -67,8 +68,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
     private bool HasLocalAuthority =>
         Object != null
         && Object.IsValid
-        && (Object.HasInputAuthority
-            || (Runner != null && Runner.GameMode == GameMode.Shared && Object.HasStateAuthority));
+        && (Runner != null && Runner.GameMode == GameMode.Shared
+            ? Object.HasStateAuthority
+            : Object.HasInputAuthority);
     private PlayerRef PlayerAuthority =>
         Object == null || !Object.IsValid
             ? PlayerRef.None
@@ -146,6 +148,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         if (Object.HasStateAuthority)
         {
             NetworkRole = (int)SquareRole.Spectator;
+            NetworkPlayerNumber = PlayerAuthority.PlayerId;
             CaptureLocalPose();
         }
 
@@ -164,23 +167,29 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
     private void CaptureLocalPose()
     {
+        if (Object == null || !Object.IsValid || !Object.HasStateAuthority)
+            return;
+
         NetworkHasXRTracking = HasXRTracking();
         NetworkRootPosition = transform.position;
         NetworkRootRotation = transform.rotation;
         if (head != null)
         {
-            NetworkHeadPosition = head.position;
-            NetworkHeadRotation = head.rotation;
+            WriteLocalPose(head, out Vector3 position, out Quaternion rotation);
+            NetworkHeadPosition = position;
+            NetworkHeadRotation = rotation;
         }
         if (leftHand != null)
         {
-            NetworkLeftHandPosition = leftHand.position;
-            NetworkLeftHandRotation = leftHand.rotation;
+            WriteLocalPose(leftHand, out Vector3 position, out Quaternion rotation);
+            NetworkLeftHandPosition = position;
+            NetworkLeftHandRotation = rotation;
         }
         if (rightHand != null)
         {
-            NetworkRightHandPosition = rightHand.position;
-            NetworkRightHandRotation = rightHand.rotation;
+            WriteLocalPose(rightHand, out Vector3 position, out Quaternion rotation);
+            NetworkRightHandPosition = position;
+            NetworkRightHandRotation = rotation;
         }
     }
 
@@ -196,9 +205,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
 
         transform.SetPositionAndRotation(NetworkRootPosition, NetworkRootRotation);
-        ReadPose(head, NetworkHeadPosition, NetworkHeadRotation);
-        ReadPose(leftHand, NetworkLeftHandPosition, NetworkLeftHandRotation);
-        ReadPose(rightHand, NetworkRightHandPosition, NetworkRightHandRotation);
+        ReadLocalPose(head, NetworkHeadPosition, NetworkHeadRotation);
+        ReadLocalPose(leftHand, NetworkLeftHandPosition, NetworkLeftHandRotation);
+        ReadLocalPose(rightHand, NetworkRightHandPosition, NetworkRightHandRotation);
     }
 
     public void RequestRole(SquareRole role)
@@ -321,7 +330,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
             }
 
             string typeName = behaviour.GetType().Name;
-            if (typeName == "TrackedPoseDriver"
+            if (typeName == "TrackedPoseDriver" || typeName == "InputActionManager"
                 || typeName == "ContinuousMoveProvider" || typeName == "SnapTurnProvider"
                 || typeName == "ContinuousTurnProvider" || typeName == "LocomotionMediator")
             {
@@ -409,9 +418,19 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         GameStateManager.Instance?.UpdateNetworkPlayerRole(this);
     }
 
-    private static void ReadPose(Transform target, Vector3 position, Quaternion rotation)
+    private void WriteLocalPose(Transform target, out Vector3 position, out Quaternion rotation)
     {
-        if (target != null) target.SetPositionAndRotation(position, rotation);
+        position = transform.InverseTransformPoint(target.position);
+        rotation = Quaternion.Inverse(transform.rotation) * target.rotation;
+    }
+
+    private void ReadLocalPose(Transform target, Vector3 position, Quaternion rotation)
+    {
+        if (target == null) return;
+
+        target.SetPositionAndRotation(
+            transform.TransformPoint(position),
+            transform.rotation * rotation);
     }
 
     private static Transform FindChild(Transform root, string childName)
