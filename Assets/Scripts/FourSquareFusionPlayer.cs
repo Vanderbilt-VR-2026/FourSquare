@@ -323,7 +323,6 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         foreach (UnityEngine.Behaviour behaviour in GetComponentsInChildren<UnityEngine.Behaviour>(true))
         {
             if (behaviour == this || behaviour is PlayerNameTag
-                || behaviour.GetComponentInParent<PlayerNameTag>() != null
                 || behaviour is XROrigin || behaviour is Camera || behaviour is AudioListener)
             {
                 continue;

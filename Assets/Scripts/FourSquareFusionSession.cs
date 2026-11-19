@@ -27,6 +27,7 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
     private bool isStarting;
     private bool ownsRunner;
     private NetworkRunner playerSpawnedRunner;
+    private NetworkRunner playerSpawnInProgressRunner;
 
     public static FourSquareFusionSession Instance { get; private set; }
     public static bool IsConfigured { get; private set; }
@@ -199,9 +200,10 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
         ownsRunner = false;
     }
 
-    private void SpawnLocalPlayer()
+    private async void SpawnLocalPlayer()
     {
-        if (runner == null || !runner.IsRunning || playerSpawnedRunner == runner)
+        if (runner == null || !runner.IsRunning ||
+            playerSpawnedRunner == runner || playerSpawnInProgressRunner == runner)
             return;
 
         if (playerPrefab == null)
@@ -211,24 +213,41 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
         }
 
         GetLocalPlayerSpawn(out Vector3 playerPosition, out Quaternion playerRotation);
-        NetworkObject spawnedPlayer =
-            runner.Spawn(playerPrefab, playerPosition, playerRotation, runner.LocalPlayer);
-        if (spawnedPlayer == null)
+        NetworkRunner spawningRunner = runner;
+        playerSpawnInProgressRunner = spawningRunner;
+        try
         {
-            Debug.LogError(
-                $"Fusion session '{runner.SessionInfo.Name}' did not return a player object from Spawn. " +
-                "Check that the VR Player prefab is in Fusion's Network Project Config prefab table.",
-                this);
-            return;
+            NetworkObject spawnedPlayer = await spawningRunner.SpawnAsync(
+                playerPrefab, playerPosition, playerRotation, spawningRunner.LocalPlayer);
+            if (spawningRunner != runner || !spawningRunner.IsRunning)
+                return;
+
+            if (spawnedPlayer == null)
+            {
+                Debug.LogError(
+                    $"Fusion session '{spawningRunner.SessionInfo.Name}' did not return a player object from " +
+                    "SpawnAsync. Check that the VR Player prefab is in Fusion's Network Project Config prefab table.",
+                    this);
+                return;
+            }
+
+            playerSpawnedRunner = spawningRunner;
+            Debug.Log(
+                $"Spawned local VR Player for {spawningRunner.LocalPlayer} at {playerPosition}. " +
+                $"XR camera active: {spawnedPlayer.GetComponent<FourSquareFusionPlayer>()?.IsLocalCameraReady}.",
+                spawnedPlayer);
+
+            EnsureNetworkBallSpawned();
         }
-
-        playerSpawnedRunner = runner;
-        Debug.Log(
-            $"Spawned local VR Player for {runner.LocalPlayer} at {playerPosition}. " +
-            $"XR camera active: {spawnedPlayer.GetComponent<FourSquareFusionPlayer>()?.IsLocalCameraReady}.",
-            spawnedPlayer);
-
-        EnsureNetworkBallSpawned();
+        catch (Exception exception)
+        {
+            Debug.LogException(exception, this);
+        }
+        finally
+        {
+            if (playerSpawnInProgressRunner == spawningRunner)
+                playerSpawnInProgressRunner = null;
+        }
     }
 
     private void EnsureNetworkBallSpawned()
