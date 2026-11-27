@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Fusion;
 using Fusion.Sockets;
+using Photon.Voice.Fusion;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 [DisallowMultipleComponent]
 public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
@@ -109,14 +111,31 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
             runner.ProvideInput = true;
             runner.AddCallbacks(this);
             ownsRunner = true;
+
+            FusionVoiceClient voiceClient = runnerObject.AddComponent<FusionVoiceClient>();
+            voiceClient.UseFusionAppSettings = true;
+            runner.RemoveCallbacks(voiceClient);
+            runner.AddCallbacks(voiceClient);
+
             INetworkSceneManager sceneManager = runnerObject.AddComponent<NetworkSceneManagerDefault>();
             INetworkObjectProvider objectProvider = runnerObject.AddComponent<NetworkObjectProviderDefault>();
+
+            Scene activeScene = SceneManager.GetActiveScene();
+            NetworkSceneInfo initialScene = new NetworkSceneInfo();
+            if (activeScene.buildIndex >= 0)
+            {
+                initialScene.AddSceneRef(
+                    SceneRef.FromIndex(activeScene.buildIndex),
+                    LoadSceneMode.Single);
+            }
 
             StartGameResult result = await runner.StartGame(new StartGameArgs
             {
                 GameMode = GameMode.Shared,
                 SessionName = sessionName.Trim(),
                 PlayerCount = Mathf.Clamp(maximumPlayers, 1, 4),
+                EnableClientSessionCreation = true,
+                Scene = initialScene,
                 SceneManager = sceneManager,
                 ObjectProvider = objectProvider
             });
@@ -315,6 +334,7 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
         foreach (Unity.XR.CoreUtils.XROrigin rig in existingRigs)
         {
             rig.gameObject.SetActive(false);
+            Destroy(rig.gameObject);
         }
     }
 

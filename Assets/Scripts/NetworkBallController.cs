@@ -438,56 +438,74 @@ public class NetworkBallController : NetworkBehaviour
             launchingSquare, strikeOrigin, strikeDirection, strikeSpeed, out selection);
 
         FoursquareGameManager gameManager = FoursquareGameManager.Instance;
-        if (gameManager == null)
+        bool rulesActive = gameManager != null &&
+                           GameStateManager.Instance != null &&
+                           GameStateManager.Instance.HasGameStarted &&
+                           gameManager.CurrentState != FoursquareGameState.WaitingToStart;
+
+        if (hitterRole == SquareRole.Spectator)
         {
-            Debug.LogError(
-                "Foursquare rules are not active: City is missing FoursquareGameManager. " +
-                "Run FourSquare > Configure Fusion Gameplay in the Unity Editor.",
-                this);
-            return false;
+            hitterRole = GetLocalPlayerRole(launchingSquare);
+            if (hitterRole == SquareRole.Spectator &&
+                (GameStateManager.Instance == null || GameStateManager.Instance.Players.Count <= 1))
+            {
+                hitterRole = SquareRole.King;
+            }
         }
 
-        bool isServe = gameManager.CurrentState == FoursquareGameState.WaitingToServe;
-        if (isServe)
+        if (rulesActive)
         {
-            if (!isPhysicalHandStrike || hitterRole != gameManager.ServingRole)
+            bool isServe = gameManager.CurrentState == FoursquareGameState.WaitingToServe;
+            if (isServe)
+            {
+                if (!isPhysicalHandStrike || hitterRole != gameManager.ServingRole)
+                {
+                    Debug.LogWarning(
+                        $"[NetworkBallController] Serve hit rejected: physical={isPhysicalHandStrike}, " +
+                        $"hitterRole={hitterRole}, servingRole={gameManager.ServingRole}.",
+                        this);
+                    return false;
+                }
+            }
+            else if (gameManager.CurrentState != FoursquareGameState.Playing)
+            {
+                Debug.LogWarning(
+                    $"[NetworkBallController] Hit rejected: game state is {gameManager.CurrentState}.",
+                    this);
                 return false;
-        }
-        else if (gameManager.CurrentState != FoursquareGameState.Playing)
-        {
-            return false;
-        }
+            }
 
-        if (lastAuthoritativeHitTimes.TryGetValue(hitterRole, out float lastHitTime) &&
-            Time.time < lastHitTime + hitCooldown)
-        {
-            Debug.Log(
-                $"[NetworkBallController] Ignored duplicate hit from {hitterRole} " +
-                $"within the {hitCooldown:0.##}s hit cooldown.",
-                this);
-            return false;
-        }
-
-        lastAuthoritativeHitTimes[hitterRole] = Time.time;
-
-        if (foursquareBall == null)
-            foursquareBall = GetComponent<FoursquareBall>();
-        if (foursquareBall == null)
-        {
-            Debug.LogError(
-                "FoursquareGameManager is active, but the network ball has no FoursquareBall rule tracker.",
-                this);
-            return false;
-        }
-        if (isServe)
-        {
-            if (!gameManager.TryBeginServe(hitterRole))
+            if (lastAuthoritativeHitTimes.TryGetValue(hitterRole, out float lastHitTime) &&
+                Time.time < lastHitTime + hitCooldown)
+            {
+                Debug.Log(
+                    $"[NetworkBallController] Ignored duplicate hit from {hitterRole} " +
+                    $"within the {hitCooldown:0.##}s hit cooldown.",
+                    this);
                 return false;
-        }
-        else if (!foursquareBall.RegisterPlayerHit(
-                     hitterRole, targetFound ? selection.targetSquare : -1))
-        {
-            return false;
+            }
+
+            lastAuthoritativeHitTimes[hitterRole] = Time.time;
+
+            if (foursquareBall == null)
+                foursquareBall = GetComponent<FoursquareBall>();
+            if (foursquareBall == null)
+            {
+                Debug.LogError(
+                    "FoursquareGameManager is active, but the network ball has no FoursquareBall rule tracker.",
+                    this);
+                return false;
+            }
+            if (isServe)
+            {
+                if (!gameManager.TryBeginServe(hitterRole))
+                    return false;
+            }
+            else if (!foursquareBall.RegisterPlayerHit(
+                         hitterRole, targetFound ? selection.targetSquare : -1))
+            {
+                return false;
+            }
         }
 
         if (targetFound)
@@ -564,23 +582,27 @@ public class NetworkBallController : NetworkBehaviour
             ? courtTargetManager.GetSquareFromPosition(transform.position)
             : sourceSquare;
 
+        SquareRole hitterRole = hand.PlayerRole != SquareRole.Spectator
+            ? hand.PlayerRole
+            : GetLocalPlayerRole(currentSquare);
+
         lastHitTimes[hand] = Time.time;
         Debug.Log(
-            $"[NetworkBallController] Intentional hand strike detected: role={hand.PlayerRole}, " +
+            $"[NetworkBallController] Intentional hand strike detected: role={hitterRole} (handRole={hand.PlayerRole}), " +
             $"speed={handSpeed:F2} m/s, approach={approachSpeed:F2} m/s, square={currentSquare}.",
             this);
 
         if (HasGameplayAuthority)
         {
             TryLaunchAuthoritative(
-                transform.position, strikeDirection, strikeSpeed, currentSquare, hand.PlayerRole,
+                transform.position, strikeDirection, strikeSpeed, currentSquare, hitterRole,
                 isPhysicalHandStrike: true);
         }
         else if (Object != null && Object.IsValid)
         {
             PlayBallHitSound();
             RPC_RequestHit(
-                transform.position, strikeDirection, strikeSpeed, currentSquare, (int)hand.PlayerRole,
+                transform.position, strikeDirection, strikeSpeed, currentSquare, (int)hitterRole,
                 isPhysicalHandStrike: true);
         }
     }
@@ -693,6 +715,11 @@ public class NetworkBallController : NetworkBehaviour
             if (wildDir.y < 0.3f) wildDir.y = 0.45f;
             ballRigidbody.linearVelocity = wildDir.normalized * (impulse.magnitude * 1.15f);
         }
+
+        Debug.Log(
+            $"[BallHitDebug] OUT OF BOUNDS HIT | strikeVelocity={strikeVelocity} | " +
+            $"ballVelocityBefore={preCollisionVelocity} | ballVelocityAfter={ballRigidbody.linearVelocity} | " +
+            $"HasStateAuthority={HasGameplayAuthority} | HasInputAuthority={(Object != null && Object.IsValid && Object.HasInputAuthority)}", this);
     }
 
     private void LaunchAt(Vector3 target, Vector3? originOverride = null, float strikeSpeed = 2.5f)
@@ -741,9 +768,19 @@ public class NetworkBallController : NetworkBehaviour
         float launchVy = (target.y - origin.y + 0.5f * gravityMagnitude * totalFlightTime * totalFlightTime) / totalFlightTime;
         Vector3 launchVelocity = velocityXZ + Vector3.up * launchVy;
 
+        Vector3 ballVelocityBefore = preCollisionVelocity;
+        bool ballKinematicBefore = ballRigidbody.isKinematic;
+
         ballRigidbody.WakeUp();
         ballRigidbody.linearVelocity = launchVelocity;
         ballRigidbody.angularVelocity = Vector3.zero;
+
+        Debug.Log(
+            $"[BallHitDebug] HAND HIT | handVelocity={strikeSpeed:F2} m/s | " +
+            $"ballVelocityBefore={ballVelocityBefore} | calculatedBallVelocity={launchVelocity} | " +
+            $"HasStateAuthority={HasGameplayAuthority} | HasInputAuthority={(Object != null && Object.IsValid && Object.HasInputAuthority)} | " +
+            $"ballIsKinematicBefore={ballKinematicBefore} | ballVelocityAfter={ballRigidbody.linearVelocity} | " +
+            $"targetMethod=CourtTargetManager.ShowTargetIndicator", this);
 
         Debug.Log($"[NetworkBallController] Launch: origin {origin}, target {target}, speed {strikeSpeed:0.#} m/s, apex {apexY:0.##}m, time {totalFlightTime:0.##}s, vel {launchVelocity}.", this);
     }

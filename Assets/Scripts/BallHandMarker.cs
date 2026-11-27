@@ -19,6 +19,7 @@ public class BallHandMarker : MonoBehaviour
     private int velocitySampleCount;
     private Renderer[] visualRenderers;
     private SphereCollider handCollider;
+    private bool visualVisible = false;
     private bool trackingActive = true;
     private bool hasValidVisual;
 
@@ -114,9 +115,6 @@ public class BallHandMarker : MonoBehaviour
             if (isNetworkedPlayer)
             {
                 visualRenderers = System.Array.Empty<Renderer>();
-                Debug.LogError(
-                    "A networked player's hand has no cube mesh assigned; refusing to create a runtime fallback.",
-                    this);
                 return;
             }
 
@@ -145,7 +143,7 @@ public class BallHandMarker : MonoBehaviour
 
         hasValidVisual = true;
         visualRenderer.sharedMaterial = visualMaterial;
-        visualRenderer.enabled = !isNetworkedPlayer;
+        visualRenderer.enabled = visualVisible && hasValidVisual;
         visualRenderer.gameObject.SetActive(true);
     }
 
@@ -172,10 +170,22 @@ public class BallHandMarker : MonoBehaviour
         {
             foreach (Renderer renderer in visualRenderers)
             {
-                if (renderer != null) renderer.enabled = active && hasValidVisual;
+                if (renderer != null) renderer.enabled = active && visualVisible && hasValidVisual;
             }
         }
         if (handCollider != null) handCollider.enabled = active;
+    }
+
+    public void SetVisualVisible(bool visible)
+    {
+        visualVisible = visible;
+        if (visualRenderers != null)
+        {
+            foreach (Renderer renderer in visualRenderers)
+            {
+                if (renderer != null) renderer.enabled = visualVisible && hasValidVisual;
+            }
+        }
     }
 
     private void Update()
