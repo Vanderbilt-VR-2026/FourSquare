@@ -32,11 +32,16 @@ public class StartScreenUI : MonoBehaviour
 
     [Header("Connection Feedback")]
     [SerializeField] private TMP_Text connectionStatusText;
+    [SerializeField] private TMP_Text joinConnectionStatusText;
 
     [Header("Multiplayer")]
     [SerializeField] private MultiplayerRoomManager multiplayerRoomManager;
 
     private bool isConnecting = false;
+    private enum FeedbackTarget { Create, Join }
+    [SerializeField] private Color normalStatusColor = Color.black;
+    [SerializeField] private Color errorStatusColor = new Color(0.8f, 0.12f, 0.12f);
+    [SerializeField] private Color successStatusColor = new Color(0.05f, 0.45f, 0.2f);
     private Coroutine roomCodeFocusCoroutine;
     private TMP_Text createRoomButtonText;
     private TMP_Text joinRoomConfirmButtonText;
@@ -58,7 +63,7 @@ public class StartScreenUI : MonoBehaviour
 
         startupInstance = this;
         CacheButtonLabels();
-        SetConnectionStatus(string.Empty);
+        ClearAllConnectionStatuses();
         SetAllPanelsInactive();
 
         if (playerCamera == null || menuCanvas == null)
@@ -176,6 +181,14 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.onClick.AddListener(OnJoinRoomConfirmed);
+
+        // Keep room codes uppercase while the user types.
+        if (roomCodeInputField != null)
+        {
+            roomCodeInputField.characterLimit = 4;
+            roomCodeInputField.onValueChanged.AddListener(OnRoomCodeChanged);
+            OnRoomCodeChanged(roomCodeInputField.text);
+        }
     }
 
     private void OnDisable()
@@ -194,6 +207,9 @@ public class StartScreenUI : MonoBehaviour
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.onClick.RemoveListener(OnJoinRoomConfirmed);
+
+        if (roomCodeInputField != null)
+            roomCodeInputField.onValueChanged.RemoveListener(OnRoomCodeChanged);
     }
 
     private void Update()
@@ -242,21 +258,37 @@ public class StartScreenUI : MonoBehaviour
             buttonText.text = label;
     }
 
-    private void SetConnectionStatus(string message)
+    private TMP_Text GetStatusText(FeedbackTarget target)
     {
-        if (connectionStatusText != null)
-        {
-            connectionStatusText.text = message;
-            connectionStatusText.gameObject.SetActive(!string.IsNullOrEmpty(message));
-        }
+        return target == FeedbackTarget.Join ? joinConnectionStatusText : connectionStatusText;
     }
 
-    private void BeginConnectionFeedback(string message)
+    private void SetConnectionStatus(FeedbackTarget target, string message, Color color)
+    {
+        TMP_Text status = GetStatusText(target);
+        if (status == null)
+        {
+            Debug.LogWarning("Missing status text for " + target + ": " + message, this);
+            return;
+        }
+
+        status.text = message;
+        status.color = color;
+        status.gameObject.SetActive(!string.IsNullOrEmpty(message));
+    }
+
+    private void ClearAllConnectionStatuses()
+    {
+        SetConnectionStatus(FeedbackTarget.Create, string.Empty, normalStatusColor);
+        SetConnectionStatus(FeedbackTarget.Join, string.Empty, normalStatusColor);
+    }
+
+    private void BeginConnectionFeedback(FeedbackTarget target, string message)
     {
         isConnecting = true;
         loadingAnimationTimer = 0f;
         loadingDotCount = 0;
-        SetConnectionStatus(message);
+        SetConnectionStatus(target, message, normalStatusColor);
     }
 
     private void EndConnectionFeedback()
@@ -264,7 +296,7 @@ public class StartScreenUI : MonoBehaviour
         isConnecting = false;
         SetButtonLabel(createRoomButtonText, createRoomButtonLabel);
         SetButtonLabel(joinRoomConfirmButtonText, joinRoomConfirmButtonLabel);
-        SetConnectionStatus(string.Empty);
+        // Do not clear status here: the user needs to read success or failure.
     }
 
     private void SetAllPanelsInactive()
@@ -353,16 +385,15 @@ public class StartScreenUI : MonoBehaviour
         if (roomCodeManager == null ||
             multiplayerRoomManager == null)
         {
-            Debug.LogError(
-                "RoomCodeManager or MultiplayerRoomManager is missing."
-            );
+            Debug.LogError("RoomCodeManager or MultiplayerRoomManager is missing.");
+            SetConnectionStatus(FeedbackTarget.Create, "Room setup is unavailable.", errorStatusColor);
             return;
         }
 
         if (multiplayerRoomManager.IsConnected)
             return;
 
-        BeginConnectionFeedback("Creating room...");
+        BeginConnectionFeedback(FeedbackTarget.Create, "Creating room...");
 
         if (createRoomButton != null)
             createRoomButton.interactable = false;
@@ -379,20 +410,18 @@ public class StartScreenUI : MonoBehaviour
             if (success)
             {
                 Debug.Log("Room created: " + code);
+                SetConnectionStatus(FeedbackTarget.Create, "Room created! Code: " + code, successStatusColor);
             }
             else
             {
-                Debug.LogError(
-                    "Unable to create Photon room. " +
-                    "Check the Console for details."
-                );
+                Debug.LogError("Unable to create Photon room. Check the Console for details.");
+                SetConnectionStatus(FeedbackTarget.Create, "Could not create room. Please try again.", errorStatusColor);
             }
         }
         catch (Exception exception)
         {
-            Debug.LogError(
-                "Create Room error: " + exception.Message
-            );
+            Debug.LogError("Create Room error: " + exception.Message);
+            SetConnectionStatus(FeedbackTarget.Create, "Connection error. Please try again.", errorStatusColor);
         }
         finally
         {
@@ -413,6 +442,7 @@ public class StartScreenUI : MonoBehaviour
             return;
 
         ShowJoinRoomPanel();
+        SetConnectionStatus(FeedbackTarget.Join, string.Empty, normalStatusColor);
 
         if (roomCodeInputField != null)
         {
@@ -439,6 +469,20 @@ public class StartScreenUI : MonoBehaviour
         roomCodeInputField.ActivateInputField();
     }
 
+    // Normalize the visible input as well as the submitted room code.
+    private void OnRoomCodeChanged(string value)
+    {
+        if (roomCodeInputField == null)
+            return;
+
+        string upper = (value ?? string.Empty).ToUpperInvariant();
+        if (upper.Length > 4)
+            upper = upper.Substring(0, 4);
+
+        if (roomCodeInputField.text != upper)
+            roomCodeInputField.SetTextWithoutNotify(upper);
+    }
+
     private async void OnJoinRoomConfirmed()
     {
         if (isConnecting)
@@ -447,9 +491,8 @@ public class StartScreenUI : MonoBehaviour
         if (multiplayerRoomManager == null ||
             roomCodeInputField == null)
         {
-            Debug.LogError(
-                "MultiplayerRoomManager or RoomCodeInputField is missing."
-            );
+            Debug.LogError("MultiplayerRoomManager or RoomCodeInputField is missing.");
+            SetConnectionStatus(FeedbackTarget.Join, "Room joining is unavailable.", errorStatusColor);
             return;
         }
 
@@ -460,7 +503,7 @@ public class StartScreenUI : MonoBehaviour
         // Validate the four-letter code.
         if (code.Length != 4)
         {
-            SetConnectionStatus("Enter a 4-letter room code.");
+            SetConnectionStatus(FeedbackTarget.Join, "Enter a 4-letter room code.", errorStatusColor);
             Debug.LogWarning(
                 "Please enter exactly four letters."
             );
@@ -471,7 +514,7 @@ public class StartScreenUI : MonoBehaviour
         {
             if (letter < 'A' || letter > 'Z')
             {
-                SetConnectionStatus("Room code must contain only A-Z.");
+                SetConnectionStatus(FeedbackTarget.Join, "Room code must contain only A-Z.", errorStatusColor);
                 Debug.LogWarning(
                     "Room code must contain only A-Z."
                 );
@@ -479,7 +522,7 @@ public class StartScreenUI : MonoBehaviour
             }
         }
 
-        BeginConnectionFeedback("Joining room...");
+        BeginConnectionFeedback(FeedbackTarget.Join, "Joining room...");
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.interactable = false;
@@ -491,23 +534,19 @@ public class StartScreenUI : MonoBehaviour
 
             if (success)
             {
-                Debug.Log(
-                    "Successfully joined room: " + code
-                );
+                Debug.Log("Successfully joined room: " + code);
+                SetConnectionStatus(FeedbackTarget.Join, "Joined room successfully!", successStatusColor);
             }
             else
             {
-                Debug.LogWarning(
-                    "Could not join room. " +
-                    "Check the room code or availability."
-                );
+                Debug.LogWarning("Could not join room. Check the room code or availability.");
+                SetConnectionStatus(FeedbackTarget.Join, "Could not join. Check the code or room availability.", errorStatusColor);
             }
         }
         catch (Exception exception)
         {
-            Debug.LogError(
-                "Join Room error: " + exception.Message
-            );
+            Debug.LogError("Join Room error: " + exception.Message);
+            SetConnectionStatus(FeedbackTarget.Join, "Connection error. Please try again.", errorStatusColor);
         }
         finally
         {
@@ -524,6 +563,7 @@ public class StartScreenUI : MonoBehaviour
             return;
 
         // Back changes panels but does not disconnect.
+        SetConnectionStatus(FeedbackTarget.Join, string.Empty, normalStatusColor);
         ShowStartScreen();
     }
 
