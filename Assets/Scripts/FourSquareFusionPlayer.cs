@@ -86,6 +86,7 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         : "Unknown Player";
 
     private BallHandMarker[] handMarkers;
+    private Collider[] bodyColliders;
     private Camera rigCamera;
     private Renderer squareHeadRenderer;
     private Material squareHeadMaterial;
@@ -153,6 +154,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
                 mixamoAnimator.parameters,
                 parameter => parameter.name == "Speed"
                     && parameter.type == AnimatorControllerParameterType.Float);
+        bodyColliders = GetComponents<Collider>();
+        if (GetComponent<PlayerNameTag>() == null)
+            gameObject.AddComponent<PlayerNameTag>();
     }
 
     private void Start()
@@ -352,6 +356,8 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         }
 
         ConfigureRigForAuthority();
+        if (HasLocalAuthority)
+            CreateCityLobbyDisplay();
         GameStateManager.Instance?.RegisterNetworkPlayer(this);
         lastRootPosition = transform.position;
         if (stickmanTransform != null)
@@ -1159,6 +1165,45 @@ public class FourSquareFusionPlayer : NetworkBehaviour
         RPC_RequestGameStart();
     }
 
+    public void IgnoreBallBodyCollision(NetworkBallController networkBall)
+    {
+        if (networkBall == null)
+            return;
+
+        if (bodyColliders == null || bodyColliders.Length == 0)
+            bodyColliders = GetComponents<Collider>();
+
+        foreach (Collider bodyCollider in bodyColliders)
+        {
+            if (bodyCollider != null)
+                networkBall.IgnorePlayerBodyCollision(bodyCollider);
+        }
+    }
+
+    public void TeleportLocalRig(Vector3 position, Quaternion rotation)
+    {
+        if (!HasLocalAuthority || xrOrigin == null)
+            return;
+
+        CharacterController characterController = xrOrigin.GetComponent<CharacterController>();
+        bool characterControllerWasEnabled =
+            characterController != null && characterController.enabled;
+
+        try
+        {
+            if (characterController != null)
+                characterController.enabled = false;
+
+            xrOrigin.transform.SetPositionAndRotation(position, rotation);
+            Physics.SyncTransforms();
+        }
+        finally
+        {
+            if (characterController != null)
+                characterController.enabled = characterControllerWasEnabled;
+        }
+    }
+
     [Rpc(RpcSources.All, RpcTargets.All)]
     public void RPC_RequestGameStart()
     {
@@ -1201,7 +1246,9 @@ public class FourSquareFusionPlayer : NetworkBehaviour
 
         foreach (UnityEngine.Behaviour behaviour in GetComponentsInChildren<UnityEngine.Behaviour>(true))
         {
-            if (behaviour == this || behaviour is XROrigin || behaviour is Camera || behaviour is AudioListener)
+            if (behaviour == this || behaviour is PlayerNameTag
+                || behaviour.GetComponentInParent<PlayerNameTag>() != null
+                || behaviour is XROrigin || behaviour is Camera || behaviour is AudioListener)
             {
                 continue;
             }
@@ -1314,6 +1361,21 @@ public class FourSquareFusionPlayer : NetworkBehaviour
                 handMarker.SetTrackingActive(showTrackedHands);
             }
         }
+    }
+
+    private void CreateCityLobbyDisplay()
+    {
+        if (head == null)
+        {
+            Debug.LogError(
+                "Cannot show City lobby status because the local XR head transform is not assigned.",
+                this);
+            return;
+        }
+
+        GameObject displayObject = new GameObject("City Lobby Status");
+        CityLobbyDisplay display = displayObject.AddComponent<CityLobbyDisplay>();
+        display.Initialize(head, rigCamera);
     }
 
     private static bool HasXRTracking()

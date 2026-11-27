@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Fusion;
 using Fusion.Sockets;
+using Photon.Voice.Fusion;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 [DisallowMultipleComponent]
 public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
@@ -21,6 +23,7 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
 
     [Header("Network Prefabs")]
     [SerializeField] private NetworkObject playerPrefab;
+    [SerializeField] private Transform joinSpawnsRoot;
     [SerializeField] private Transform playerSpawnPoint;
 
     private NetworkRunner runner;
@@ -108,14 +111,31 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
             runner.ProvideInput = true;
             runner.AddCallbacks(this);
             ownsRunner = true;
+
+            FusionVoiceClient voiceClient = runnerObject.AddComponent<FusionVoiceClient>();
+            voiceClient.UseFusionAppSettings = true;
+            runner.RemoveCallbacks(voiceClient);
+            runner.AddCallbacks(voiceClient);
+
             INetworkSceneManager sceneManager = runnerObject.AddComponent<NetworkSceneManagerDefault>();
             INetworkObjectProvider objectProvider = runnerObject.AddComponent<NetworkObjectProviderDefault>();
+
+            Scene activeScene = SceneManager.GetActiveScene();
+            NetworkSceneInfo initialScene = new NetworkSceneInfo();
+            if (activeScene.buildIndex >= 0)
+            {
+                initialScene.AddSceneRef(
+                    SceneRef.FromIndex(activeScene.buildIndex),
+                    LoadSceneMode.Single);
+            }
 
             StartGameResult result = await runner.StartGame(new StartGameArgs
             {
                 GameMode = GameMode.Shared,
                 SessionName = sessionName.Trim(),
                 PlayerCount = Mathf.Clamp(maximumPlayers, 1, 4),
+                EnableClientSessionCreation = true,
+                Scene = initialScene,
                 SceneManager = sceneManager,
                 ObjectProvider = objectProvider
             });
@@ -291,14 +311,23 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
     {
         Unity.XR.CoreUtils.XROrigin[] existingRigs =
             FindObjectsByType<Unity.XR.CoreUtils.XROrigin>(FindObjectsSortMode.None);
-        position = playerSpawnPoint != null ? playerSpawnPoint.position : transform.position;
-        rotation = playerSpawnPoint != null ? playerSpawnPoint.rotation : transform.rotation;
+        Transform joinSpawn = GetJoinSpawn();
+        if (joinSpawn != null)
+        {
+            position = joinSpawn.position;
+            rotation = joinSpawn.rotation;
+        }
+        else
+        {
+            position = playerSpawnPoint != null ? playerSpawnPoint.position : transform.position;
+            rotation = playerSpawnPoint != null ? playerSpawnPoint.rotation : transform.rotation;
+        }
 
-        if (playerSpawnPoint == null)
+        if (joinSpawn == null && playerSpawnPoint == null)
         {
             Debug.LogWarning(
-                "No player spawn point is assigned. The VR Player will spawn at the Fusion session object's position. " +
-                "Assign Player Spawn Point in the City scene.",
+                "No join spawn point is assigned. The VR Player will spawn at the Fusion session object's position. " +
+                "Assign Join Spawns in the City scene.",
                 this);
         }
 
@@ -307,6 +336,34 @@ public class FourSquareFusionSession : MonoBehaviour, INetworkRunnerCallbacks
             rig.gameObject.SetActive(false);
             Destroy(rig.gameObject);
         }
+    }
+
+    private Transform GetJoinSpawn()
+    {
+        if (joinSpawnsRoot == null)
+        {
+            Debug.LogError(
+                "Join Spawns is not assigned. The VR Player cannot be placed by join order.",
+                this);
+            return null;
+        }
+
+        int playerNumber = runner != null ? runner.LocalPlayer.PlayerId : 0;
+        if (playerNumber < 1)
+        {
+            Debug.LogError("The local Fusion player has no valid join-order ID.", this);
+            return null;
+        }
+
+        Transform spawn = joinSpawnsRoot.Find($"Player{playerNumber}");
+        if (spawn == null)
+        {
+            Debug.LogError(
+                $"Join Spawns is missing a Player{playerNumber} child for the local Fusion player.",
+                joinSpawnsRoot);
+        }
+
+        return spawn;
     }
 
     private void OnDestroy()

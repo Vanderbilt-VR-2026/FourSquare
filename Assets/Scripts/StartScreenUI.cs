@@ -11,83 +11,82 @@ public class StartScreenUI : MonoBehaviour
     [SerializeField] private Button createRoomButton;
     [SerializeField] private Button joinRoomButton;
     [SerializeField] private Button quitButton;
-    [SerializeField] private Button createRoomBackButton;
     [SerializeField] private Button joinRoomBackButton;
     [SerializeField] private Button joinRoomConfirmButton;
 
     [Header("Panels")]
     [SerializeField] private GameObject startScreenPanel;
-    [SerializeField] private GameObject createRoomPanel;
     [SerializeField] private GameObject joinRoomPanel;
-
-    [Header("Multiplayer Lobby")]
-    [SerializeField] private GameObject roomLobbyPanel;
 
     [Header("VR Menu Placement")]
     [SerializeField] private Transform playerCamera;
     [SerializeField] private Transform menuCanvas;
     [SerializeField] private float menuDistance = 2f;
-    [SerializeField] private float menuHeightOffset = 0.15f;
-    [SerializeField] private float fallbackCameraHeight = 1.6f;
     [SerializeField] private float trackingInitializationTimeout = 5f;
 
     [Header("Room Creation")]
     [SerializeField] private RoomCodeManager roomCodeManager;
-    [SerializeField] private TMP_Text roomCodeText;
 
     [Header("Join Room")]
     [SerializeField] private TMP_InputField roomCodeInputField;
 
+    [Header("Connection Feedback")]
+    [SerializeField] private TMP_Text connectionStatusText;
+
     [Header("Multiplayer")]
     [SerializeField] private MultiplayerRoomManager multiplayerRoomManager;
 
-    [Header("Connection Status")]
-    [SerializeField] private TMP_Text connectionStatusText;
-    [SerializeField] private TMP_Text joinConnectionStatusText;
-
-    private string currentRoomCode;
     private bool isConnecting = false;
-
-    // ---------------- INITIALIZATION ----------------
+    private Coroutine roomCodeFocusCoroutine;
+    private TMP_Text createRoomButtonText;
+    private TMP_Text joinRoomConfirmButtonText;
+    private string createRoomButtonLabel;
+    private string joinRoomConfirmButtonLabel;
+    private float loadingAnimationTimer;
+    private int loadingDotCount;
+    private Camera startupOverlayCamera;
+    private CameraClearFlags startupCameraClearFlags;
+    private Color startupCameraBackgroundColor;
+    private int startupCameraCullingMask;
+    private bool isStartupOverlayVisible;
+    private static StartScreenUI startupInstance;
 
     private IEnumerator Start()
     {
+        if (startupInstance != null)
+            yield break;
+
+        startupInstance = this;
+        CacheButtonLabels();
+        SetConnectionStatus(string.Empty);
         SetAllPanelsInactive();
-        ClearStatusMessages();
 
         if (playerCamera == null || menuCanvas == null)
         {
-            Debug.LogError(
-                "Player camera or menu canvas is not assigned in StartScreenUI.",
-                this
-            );
-
+            Debug.LogError("Player camera or menu canvas is not assigned in StartScreenUI.", this);
             ShowStartScreen();
             yield break;
         }
 
-        Canvas canvas = menuCanvas.GetComponent<Canvas>();
+        ShowStartupOverlay();
 
+        Canvas canvas = menuCanvas.GetComponent<Canvas>();
         if (canvas != null && canvas.renderMode == RenderMode.WorldSpace)
         {
             if (menuCanvas.GetComponent<GraphicRaycaster>() == null)
-            {
                 menuCanvas.gameObject.AddComponent<GraphicRaycaster>();
-            }
 
             Camera eventCamera = playerCamera.GetComponent<Camera>();
-
             if (eventCamera == null)
                 eventCamera = Camera.main;
 
             if (eventCamera == null || !eventCamera.isActiveAndEnabled)
             {
                 Debug.LogError(
-                    "The world-space start menu needs an enabled event camera. " +
-                    "Assign an enabled camera to Player Camera or tag it MainCamera.",
-                    this
-                );
-
+                    "The world-space start menu needs an enabled event camera. Assign an enabled camera " +
+                    "to Player Camera or tag it MainCamera.",
+                    this);
+                HideStartupOverlay();
                 ShowStartScreen();
                 yield break;
             }
@@ -96,17 +95,17 @@ public class StartScreenUI : MonoBehaviour
         }
 
         yield return new WaitForSecondsRealtime(0.5f);
-
         bool hasTrackedHeadPose = HasTrackedHeadPose();
-
-        CenterMenuInFrontOfPlayer(hasTrackedHeadPose);
+        PlacePlayerInFrontOfMenu();
         ShowStartScreen();
 
         if (hasTrackedHeadPose)
+        {
+            HideStartupOverlay();
             yield break;
+        }
 
         float elapsed = 0f;
-
         while (elapsed < trackingInitializationTimeout)
         {
             yield return null;
@@ -114,13 +113,52 @@ public class StartScreenUI : MonoBehaviour
 
             if (HasTrackedHeadPose())
             {
-                CenterMenuInFrontOfPlayer(true);
+                PlacePlayerInFrontOfMenu();
+                HideStartupOverlay();
                 yield break;
             }
         }
+
+        HideStartupOverlay();
     }
 
-    // ---------------- BUTTON LISTENERS ----------------
+    private void OnDestroy()
+    {
+        if (startupInstance == this)
+            startupInstance = null;
+    }
+
+    private void ShowStartupOverlay()
+    {
+        Camera camera = playerCamera.GetComponent<Camera>();
+        if (camera == null)
+            camera = Camera.main;
+
+        if (camera == null)
+            return;
+
+        startupOverlayCamera = camera;
+        startupCameraClearFlags = camera.clearFlags;
+        startupCameraBackgroundColor = camera.backgroundColor;
+        startupCameraCullingMask = camera.cullingMask;
+        isStartupOverlayVisible = true;
+
+        camera.clearFlags = CameraClearFlags.SolidColor;
+        camera.backgroundColor = Color.black;
+        camera.cullingMask = 0;
+    }
+
+    private void HideStartupOverlay()
+    {
+        if (!isStartupOverlayVisible || startupOverlayCamera == null)
+            return;
+
+        startupOverlayCamera.clearFlags = startupCameraClearFlags;
+        startupOverlayCamera.backgroundColor = startupCameraBackgroundColor;
+        startupOverlayCamera.cullingMask = startupCameraCullingMask;
+        startupOverlayCamera = null;
+        isStartupOverlayVisible = false;
+    }
 
     private void OnEnable()
     {
@@ -132,9 +170,6 @@ public class StartScreenUI : MonoBehaviour
 
         if (quitButton != null)
             quitButton.onClick.AddListener(OnQuitClicked);
-
-        if (createRoomBackButton != null)
-            createRoomBackButton.onClick.AddListener(OnBackClicked);
 
         if (joinRoomBackButton != null)
             joinRoomBackButton.onClick.AddListener(OnBackClicked);
@@ -154,9 +189,6 @@ public class StartScreenUI : MonoBehaviour
         if (quitButton != null)
             quitButton.onClick.RemoveListener(OnQuitClicked);
 
-        if (createRoomBackButton != null)
-            createRoomBackButton.onClick.RemoveListener(OnBackClicked);
-
         if (joinRoomBackButton != null)
             joinRoomBackButton.onClick.RemoveListener(OnBackClicked);
 
@@ -164,132 +196,156 @@ public class StartScreenUI : MonoBehaviour
             joinRoomConfirmButton.onClick.RemoveListener(OnJoinRoomConfirmed);
     }
 
-    // ---------------- PANELS ----------------
+    private void Update()
+    {
+        if (!isConnecting)
+            return;
+
+        loadingAnimationTimer += Time.unscaledDeltaTime;
+        if (loadingAnimationTimer < 0.35f)
+            return;
+
+        loadingAnimationTimer = 0f;
+        loadingDotCount = (loadingDotCount + 1) % 4;
+        string dots = new string('.', loadingDotCount);
+
+        if (createRoomButton != null && !createRoomButton.interactable)
+            SetButtonLabel(createRoomButtonText, createRoomButtonLabel + dots);
+
+        if (joinRoomConfirmButton != null && !joinRoomConfirmButton.interactable)
+            SetButtonLabel(joinRoomConfirmButtonText, joinRoomConfirmButtonLabel + dots);
+    }
+
+    private void CacheButtonLabels()
+    {
+        if (createRoomButton != null)
+        {
+            createRoomButtonText = createRoomButton.GetComponentInChildren<TMP_Text>();
+            createRoomButtonLabel = createRoomButtonText != null
+                ? createRoomButtonText.text
+                : string.Empty;
+        }
+
+        if (joinRoomConfirmButton != null)
+        {
+            joinRoomConfirmButtonText =
+                joinRoomConfirmButton.GetComponentInChildren<TMP_Text>();
+            joinRoomConfirmButtonLabel = joinRoomConfirmButtonText != null
+                ? joinRoomConfirmButtonText.text
+                : string.Empty;
+        }
+    }
+
+    private void SetButtonLabel(TMP_Text buttonText, string label)
+    {
+        if (buttonText != null)
+            buttonText.text = label;
+    }
+
+    private void SetConnectionStatus(string message)
+    {
+        if (connectionStatusText != null)
+        {
+            connectionStatusText.text = message;
+            connectionStatusText.gameObject.SetActive(!string.IsNullOrEmpty(message));
+        }
+    }
+
+    private void BeginConnectionFeedback(string message)
+    {
+        isConnecting = true;
+        loadingAnimationTimer = 0f;
+        loadingDotCount = 0;
+        SetConnectionStatus(message);
+    }
+
+    private void EndConnectionFeedback()
+    {
+        isConnecting = false;
+        SetButtonLabel(createRoomButtonText, createRoomButtonLabel);
+        SetButtonLabel(joinRoomConfirmButtonText, joinRoomConfirmButtonLabel);
+        SetConnectionStatus(string.Empty);
+    }
 
     private void SetAllPanelsInactive()
     {
         if (startScreenPanel != null)
             startScreenPanel.SetActive(false);
 
-        if (createRoomPanel != null)
-            createRoomPanel.SetActive(false);
-
         if (joinRoomPanel != null)
             joinRoomPanel.SetActive(false);
-
-        if (roomLobbyPanel != null)
-            roomLobbyPanel.SetActive(false);
     }
 
     private void ShowStartScreen()
     {
         SetAllPanelsInactive();
-        ClearStatusMessages();
 
         if (startScreenPanel != null)
             startScreenPanel.SetActive(true);
     }
 
-    private void ShowCreateRoomPanel()
-    {
-        SetAllPanelsInactive();
-
-        if (createRoomPanel != null)
-            createRoomPanel.SetActive(true);
-    }
-
     private void ShowJoinRoomPanel()
     {
         SetAllPanelsInactive();
-        SetJoinRoomStatus("");
 
         if (joinRoomPanel != null)
             joinRoomPanel.SetActive(true);
     }
 
-    private void ShowLobby()
-    {
-        SetAllPanelsInactive();
-        ClearStatusMessages();
-
-        if (roomLobbyPanel != null)
-        {
-            roomLobbyPanel.SetActive(true);
-            Debug.Log("[FourSquare] Multiplayer lobby opened.");
-        }
-        else
-        {
-            Debug.LogError(
-                "RoomLobbyPanel is not assigned in StartScreenUI.",
-                this
-            );
-        }
-    }
-
-    // ---------------- STATUS MESSAGES ----------------
-
-    private void ClearStatusMessages()
-    {
-        SetCreateRoomStatus("");
-        SetJoinRoomStatus("");
-    }
-
-    private void SetCreateRoomStatus(string message)
-    {
-        if (connectionStatusText != null)
-            connectionStatusText.text = message;
-    }
-
-    private void SetJoinRoomStatus(string message)
-    {
-        if (joinConnectionStatusText != null)
-            joinConnectionStatusText.text = message;
-    }
-
-    // ---------------- VR MENU PLACEMENT ----------------
-
     private bool HasTrackedHeadPose()
     {
         return UnityEngine.XR.XRSettings.isDeviceActive &&
             playerCamera != null &&
-            playerCamera.position.y -
-            playerCamera.root.position.y > 0.5f;
+            playerCamera.position.y - playerCamera.root.position.y > 0.5f;
     }
 
-    private void CenterMenuInFrontOfPlayer(bool useTrackedHeight)
+    private void PlacePlayerInFrontOfMenu()
     {
         if (playerCamera == null || menuCanvas == null)
             return;
 
-        Vector3 forward = Vector3.ProjectOnPlane(
+        Transform playerRoot = playerCamera.root;
+        if (playerRoot == null)
+            return;
+
+        Vector3 menuForward = Vector3.ProjectOnPlane(
+            menuCanvas.forward,
+            Vector3.up
+        );
+
+        if (menuForward.sqrMagnitude < 0.001f)
+            return;
+
+        menuForward.Normalize();
+
+        Vector3 cameraForward = Vector3.ProjectOnPlane(
             playerCamera.forward,
             Vector3.up
         );
 
-        if (forward.sqrMagnitude < 0.001f)
-            forward = Vector3.forward;
+        if (cameraForward.sqrMagnitude > 0.001f)
+        {
+            cameraForward.Normalize();
+            float yawCorrection = Vector3.SignedAngle(
+                cameraForward,
+                menuForward,
+                Vector3.up
+            );
+            playerRoot.rotation =
+                Quaternion.AngleAxis(yawCorrection, Vector3.up) * playerRoot.rotation;
+        }
 
-        forward.Normalize();
+        Vector3 menuCenter = menuCanvas.position;
+        RectTransform menuRect = menuCanvas as RectTransform;
+        if (menuRect != null)
+            menuCenter = menuRect.TransformPoint(menuRect.rect.center);
 
-        Vector3 targetPosition =
-            playerCamera.position + forward * menuDistance;
-
-        targetPosition.y = useTrackedHeight
-            ? playerCamera.position.y + menuHeightOffset
-            : playerCamera.root.position.y +
-              fallbackCameraHeight + menuHeightOffset;
-
-        menuCanvas.position = targetPosition;
-
-        menuCanvas.rotation = Quaternion.LookRotation(
-            forward,
-            Vector3.up
-        );
+        Vector3 targetCameraPosition = menuCenter - menuForward * menuDistance;
+        targetCameraPosition.y = playerCamera.position.y;
+        playerRoot.position += targetCameraPosition - playerCamera.position;
     }
 
-    // ---------------- CREATE ROOM ----------------
-
-    private void OnCreateRoomClicked()
+    private async void OnCreateRoomClicked()
     {
         if (isConnecting)
             return;
@@ -297,113 +353,55 @@ public class StartScreenUI : MonoBehaviour
         if (roomCodeManager == null ||
             multiplayerRoomManager == null)
         {
-            SetCreateRoomStatus("Could not create room.");
-
             Debug.LogError(
-                "RoomCodeManager or MultiplayerRoomManager is missing.",
-                this
+                "RoomCodeManager or MultiplayerRoomManager is missing."
             );
             return;
         }
 
         if (multiplayerRoomManager.IsConnected)
-        {
-            currentRoomCode =
-                multiplayerRoomManager.CurrentRoomCode;
-
-            DisplayRoomCode(currentRoomCode);
-            ShowLobby();
             return;
-        }
 
-        isConnecting = true;
+        BeginConnectionFeedback("Creating room...");
 
         if (createRoomButton != null)
             createRoomButton.interactable = false;
 
-        SetCreateRoomStatus("CREATING ROOM...");
-
-        StartCoroutine(CreateRoomAfterFrame());
-    }
-
-    private IEnumerator CreateRoomAfterFrame()
-    {
-        // Give Unity one frame to render the loading message.
-        yield return null;
-
-        CreateRoomAsync();
-    }
-
-    private async void CreateRoomAsync()
-    {
-        float startTime = Time.realtimeSinceStartup;
-
         try
         {
+            // Generate a candidate four-letter room code.
             string code =
                 roomCodeManager.CreateUniqueRoomCode();
-
-            Debug.Log(
-                "[FourSquare] Creating room: " + code
-            );
 
             bool success =
                 await multiplayerRoomManager.CreateRoom(code);
 
-            float elapsed =
-                Time.realtimeSinceStartup - startTime;
-
-            Debug.Log(
-                $"[FourSquare] Room creation took " +
-                $"{elapsed:F2} seconds. Success: {success}"
-            );
-
             if (success)
             {
-                currentRoomCode = code;
-                DisplayRoomCode(code);
-
-                Debug.Log(
-                    "[FourSquare] Room created: " + code
-                );
-
-                ShowLobby();
+                Debug.Log("Room created: " + code);
             }
             else
             {
-                SetCreateRoomStatus("Could not create room.");
-
                 Debug.LogError(
-                    "[FourSquare] Unable to create Photon room.",
-                    this
+                    "Unable to create Photon room. " +
+                    "Check the Console for details."
                 );
             }
         }
         catch (Exception exception)
         {
-            SetCreateRoomStatus("Could not create room.");
-
             Debug.LogError(
-                "[FourSquare] Create Room error: " + exception,
-                this
+                "Create Room error: " + exception.Message
             );
         }
         finally
         {
-            isConnecting = false;
+            EndConnectionFeedback();
 
             if (createRoomButton != null)
                 createRoomButton.interactable = true;
         }
     }
-
-    private void DisplayRoomCode(string code)
-    {
-        if (roomCodeText != null)
-            roomCodeText.text = "ROOM CODE: " + code;
-    }
-
-    // ---------------- JOIN ROOM ----------------
 
     private void OnJoinRoomClicked()
     {
@@ -412,22 +410,36 @@ public class StartScreenUI : MonoBehaviour
 
         if (multiplayerRoomManager != null &&
             multiplayerRoomManager.IsConnected)
-        {
-            currentRoomCode =
-                multiplayerRoomManager.CurrentRoomCode;
-
-            DisplayRoomCode(currentRoomCode);
-            ShowLobby();
             return;
-        }
 
         ShowJoinRoomPanel();
 
         if (roomCodeInputField != null)
+        {
             roomCodeInputField.text = "";
+            if (roomCodeFocusCoroutine != null)
+                StopCoroutine(roomCodeFocusCoroutine);
+
+            roomCodeFocusCoroutine =
+                StartCoroutine(FocusRoomCodeInputField());
+        }
     }
 
-    private void OnJoinRoomConfirmed()
+    private IEnumerator FocusRoomCodeInputField()
+    {
+        yield return null;
+
+        roomCodeFocusCoroutine = null;
+        if (joinRoomPanel == null ||
+            !joinRoomPanel.activeInHierarchy ||
+            roomCodeInputField == null)
+            yield break;
+
+        roomCodeInputField.Select();
+        roomCodeInputField.ActivateInputField();
+    }
+
+    private async void OnJoinRoomConfirmed()
     {
         if (isConnecting)
             return;
@@ -435,11 +447,8 @@ public class StartScreenUI : MonoBehaviour
         if (multiplayerRoomManager == null ||
             roomCodeInputField == null)
         {
-            SetJoinRoomStatus("Unable to join room.");
-
             Debug.LogError(
-                "MultiplayerRoomManager or RoomCodeInputField is missing.",
-                this
+                "MultiplayerRoomManager or RoomCodeInputField is missing."
             );
             return;
         }
@@ -448,127 +457,75 @@ public class StartScreenUI : MonoBehaviour
             .Trim()
             .ToUpperInvariant();
 
-        // Empty code
-        if (code.Length == 0)
-        {
-            SetJoinRoomStatus("Enter a 4-letter code.");
-            return;
-        }
-
-        // Incorrect length
+        // Validate the four-letter code.
         if (code.Length != 4)
         {
-            SetJoinRoomStatus("Enter exactly 4 letters.");
+            SetConnectionStatus("Enter a 4-letter room code.");
+            Debug.LogWarning(
+                "Please enter exactly four letters."
+            );
             return;
         }
 
-        // Invalid characters
         foreach (char letter in code)
         {
             if (letter < 'A' || letter > 'Z')
             {
-                SetJoinRoomStatus("Use letters A-Z only.");
+                SetConnectionStatus("Room code must contain only A-Z.");
+                Debug.LogWarning(
+                    "Room code must contain only A-Z."
+                );
                 return;
             }
         }
 
-        isConnecting = true;
+        BeginConnectionFeedback("Joining room...");
 
         if (joinRoomConfirmButton != null)
             joinRoomConfirmButton.interactable = false;
 
-        SetJoinRoomStatus("Joining room...");
-
-        StartCoroutine(JoinRoomAfterFrame(code));
-    }
-
-    private IEnumerator JoinRoomAfterFrame(string code)
-    {
-        // Allow the loading message to render first.
-        yield return null;
-
-        JoinRoomAsync(code);
-    }
-
-    private async void JoinRoomAsync(string code)
-    {
-        float startTime = Time.realtimeSinceStartup;
-
         try
         {
-            Debug.Log(
-                "[FourSquare] Joining room: " + code
-            );
-
             bool success =
                 await multiplayerRoomManager.JoinRoom(code);
 
-            float elapsed =
-                Time.realtimeSinceStartup - startTime;
-
-            Debug.Log(
-                $"[FourSquare] Join Room took " +
-                $"{elapsed:F2} seconds. Success: {success}"
-            );
-
             if (success)
             {
-                currentRoomCode = code;
-                DisplayRoomCode(code);
-
                 Debug.Log(
-                    "[FourSquare] Successfully joined room: " + code
+                    "Successfully joined room: " + code
                 );
-
-                ShowLobby();
             }
             else
             {
-                SetJoinRoomStatus("Could not join room.");
-
                 Debug.LogWarning(
-                    "[FourSquare] Could not join room. " +
-                    "Check the room code or availability.",
-                    this
+                    "Could not join room. " +
+                    "Check the room code or availability."
                 );
             }
         }
         catch (Exception exception)
         {
-            SetJoinRoomStatus("Could not join room.");
-
             Debug.LogError(
-                "[FourSquare] Join Room error: " + exception,
-                this
+                "Join Room error: " + exception.Message
             );
         }
         finally
         {
-            isConnecting = false;
+            EndConnectionFeedback();
 
             if (joinRoomConfirmButton != null)
                 joinRoomConfirmButton.interactable = true;
         }
     }
 
-    // ---------------- BACK / RETURN ----------------
-
     private void OnBackClicked()
     {
         if (isConnecting)
             return;
 
+        // Back changes panels but does not disconnect.
         ShowStartScreen();
     }
-
-    // Called by RoomLobbyUI after successfully leaving.
-    public void ReturnToStartScreen()
-    {
-        currentRoomCode = null;
-        ShowStartScreen();
-    }
-
-    // ---------------- QUIT ----------------
 
     private void OnQuitClicked()
     {
